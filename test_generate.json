@@ -1,0 +1,1 @@
+{"certificateText":"证书：第十八届挑战杯全国大学生课外学术科技作品竞赛国家级二等奖，队长张三，2024年6月","selectedTemplateId":1,"selectedRuleId":2,"template":{"id":1,"templateName":"学科竞赛加分","templateType":"CONDITION","scoreType":0,"templateMaxScore":12,"rules":[{"id":1,"ruleName":"国家级一等奖","ruleScore":8},{"id":2,"ruleName":"国家级二等奖","ruleScore":4.5},{"id":3,"ruleName":"省级一等奖","ruleScore":2.4}]}}
