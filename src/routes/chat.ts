@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { chatWithAgent, clearConversation } from '../services/ragChain.js'
+import { chatWithAgent, chatWithAgentStream, clearConversation } from '../services/ragChain.js'
 
 const router = Router()
 
@@ -15,6 +15,33 @@ router.post('/send', async (req, res) => {
   } catch (err) {
     console.error('[chat/send] error:', err)
     res.json({ code: 200, msg: 'AI服务暂时不可用，请稍后重试', data: null, aiAvailable: false })
+  }
+})
+
+/** 流式聊天：返回 SSE 流，每个 token 一个 data 事件，结束发 [DONE] */
+router.post('/stream', async (req, res) => {
+  const { sessionId, message } = req.body as { sessionId?: string; message?: string }
+  if (!sessionId || !message?.trim()) {
+    res.json({ code: 400, msg: '缺少 sessionId 或 message', data: null })
+    return
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')  // 禁用 Nginx 缓冲
+  res.flushHeaders()
+
+  try {
+    for await (const token of chatWithAgentStream(sessionId, message.trim())) {
+      res.write(`data: ${JSON.stringify({ token })}\n\n`)
+    }
+    res.write('data: [DONE]\n\n')
+  } catch (err) {
+    console.error('[chat/stream] error:', err)
+    res.write(`data: ${JSON.stringify({ error: 'AI服务暂时不可用，请稍后重试' })}\n\n`)
+  } finally {
+    res.end()
   }
 })
 

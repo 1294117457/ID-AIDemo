@@ -30,40 +30,64 @@ function saveMessage(sessionId: string, role: string, content: string): void {
     .run(sessionId, role, content)
 }
 
-/** RAG 对话 */
-export async function chatWithAgent(sessionId: string, userMessage: string): Promise<string> {
-  const chatModel = createChatModel()
+/** 构建对话消息数组（供两种调用方式共用） */
+function buildMessages(sessionId: string, userMessage: string, contextText: string) {
   const SYSTEM_BASE = getSystemRole()
-
-  // 1. 检索相关知识块
-  const queryVec = await getEmbedding(userMessage)
-  const chunks = searchSimilar(queryVec, 5)
-
-  const contextText =
-    chunks.length > 0
-      ? chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
-      : '（知识库暂无相关内容）'
-
-  // 2. 构建消息数组
   const systemMsg = new SystemMessage(`${SYSTEM_BASE}\n\n【相关知识库内容】\n${contextText}`)
-
-  // 3. 拼接历史（倒序取出后反转为正序）
   const history = getHistory(sessionId).reverse()
   const historyMsgs = history.map(h =>
     h.role === 'user' ? new HumanMessage(h.content) : new AIMessage(h.content)
   )
+  return [systemMsg, ...historyMsgs, new HumanMessage(userMessage)]
+}
 
-  const messages = [systemMsg, ...historyMsgs, new HumanMessage(userMessage)]
+/** 准备 RAG 上下文 */
+async function buildContext(userMessage: string): Promise<string> {
+  const queryVec = await getEmbedding(userMessage)
+  const chunks = searchSimilar(queryVec, 5)
+  return chunks.length > 0
+    ? chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
+    : '（知识库暂无相关内容）'
+}
 
-  // 4. 调用 Qwen3
-  const response = await chatModel.invoke(messages)
+/** RAG 对话（非流式，保留兼容） */
+export async function chatWithAgent(sessionId: string, userMessage: string): Promise<string> {
+  const chatModel = createChatModel()
+  const contextText = await buildContext(userMessage)
+  const msgs = buildMessages(sessionId, userMessage, contextText)
+
+  const response = await chatModel.invoke(msgs)
   const reply = String(response.content)
 
-  // 5. 存储历史
   saveMessage(sessionId, 'user', userMessage)
   saveMessage(sessionId, 'assistant', reply)
 
   return reply
+}
+
+/** RAG 对话（流式，逐 token yield） */
+export async function* chatWithAgentStream(
+  sessionId: string,
+  userMessage: string
+): AsyncGenerator<string> {
+  const chatModel = createChatModel()
+  const contextText = await buildContext(userMessage)
+  const msgs = buildMessages(sessionId, userMessage, contextText)
+
+  let fullReply = ''
+  const stream = await chatModel.stream(msgs)
+
+  for await (const chunk of stream) {
+    const token = String(chunk.content)
+    if (token) {
+      fullReply += token
+      yield token
+    }
+  }
+
+  // 流式完成后统一保存历史
+  saveMessage(sessionId, 'user', userMessage)
+  saveMessage(sessionId, 'assistant', fullReply)
 }
 
 /** 清除 session 历史 */
