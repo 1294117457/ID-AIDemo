@@ -2,6 +2,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { getEmbedding } from './embeddings.js'
 import { searchSimilar } from './vectorStore.js'
+import { getApiKey, getBaseUrl, getChatModel } from './aiConfig.js'
 
 // ---------- 类型定义（与 idbackend ScoreTemplateDto / ScoreTemplateRuleDto 对齐）----------
 
@@ -31,16 +32,16 @@ export interface AnalyzeSuggestion {
   reason: string
 }
 
-// ---------- 模型实例（低温度保证 JSON 输出稳定）----------
+// ---------- 模型工厂（每次调用时读最新配置）----------
 
-const analyzeModel = new ChatOpenAI({
-  apiKey: process.env.QWEN3_API_KEY,
-  configuration: {
-    baseURL: process.env.QWEN_BASE_URL ?? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  },
-  modelName: process.env.QWEN_CHAT_MODEL ?? 'qwen3-max',
-  temperature: 0.1,
-})
+function createAnalyzeModel() {
+  return new ChatOpenAI({
+    apiKey: getApiKey(),
+    configuration: { baseURL: getBaseUrl() },
+    modelName: getChatModel(),
+    temperature: 0.1,
+  })
+}
 
 // ---------- 工具函数 ----------
 
@@ -111,6 +112,7 @@ ${policyContext}
 如果无任何匹配，返回 []`)
 
   // 4. 调用模型
+  const analyzeModel = createAnalyzeModel()
   const response = await analyzeModel.invoke([systemMsg, userMsg])
   const raw = String(response.content)
 
@@ -150,6 +152,6 @@ ${certificateText.slice(0, 1500)}
 
 请生成简洁的申请备注，描述证明材料的关键信息（比赛/论文名称、获奖/发表等级、时间等）。`)
 
-  const response = await analyzeModel.invoke([systemMsg, userMsg])
+  const response = await createAnalyzeModel().invoke([systemMsg, userMsg])
   return String(response.content).trim()
 }

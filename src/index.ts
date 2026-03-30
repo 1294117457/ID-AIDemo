@@ -6,6 +6,7 @@ import { seedKnowledge } from './seed/seedKnowledge.js'
 import chatRouter from './routes/chat.js'
 import knowledgeRouter from './routes/knowledge.js'
 import analyzeRouter from './routes/analyze.js'
+import configRouter from './routes/config.js'
 
 const app = express()
 app.use(cors())
@@ -19,6 +20,7 @@ app.get('/health', (_req, res) => {
 app.use('/chat', chatRouter)
 app.use('/knowledge', knowledgeRouter)
 app.use('/analyze', analyzeRouter)
+app.use('/config', configRouter)
 
 const PORT = Number(process.env.PORT ?? 3001)
 
@@ -37,6 +39,8 @@ async function main(): Promise<void> {
     console.log('  DEL  /knowledge/:sourceFile')
     console.log('  POST /analyze/certificate')
     console.log('  POST /analyze/generate')
+    console.log('  GET  /config')
+    console.log('  PUT  /config')
   })
 }
 
