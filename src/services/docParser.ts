@@ -60,7 +60,7 @@ async function parsePdf(filePath: string): Promise<string> {
   const { PDFParse } = await import('pdf-parse')
   const buffer = fs.readFileSync(filePath)
   const parser = new PDFParse({ data: buffer })
-  await parser.load()
+  await (parser as any).load()
   const result = await parser.getText()
   return result.text
 }
