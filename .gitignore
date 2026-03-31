@@ -54,3 +54,9 @@ coverage/
 # IDE temp files
 *.code-workspace
 .vscode-test/
+node_modules
+dist
+.vscode
+.git
+npm-debug.log*
+.env
