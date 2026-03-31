@@ -31,6 +31,17 @@ if (typeof globalThis !== 'undefined') {
         };
     }
 }
+// 修复 process.getBuiltinModule 不存在的问题
+if (typeof process !== 'undefined' && !process.getBuiltinModule) {
+    process.getBuiltinModule = (id) => {
+        try {
+            return require(id);
+        }
+        catch {
+            return null;
+        }
+    };
+}
 /** 将文件解析为纯文本，不支持的格式返回空字符串
  * @param filePath    实际文件路径
  * @param hintExt     可选：原始文件扩展名（multer 临时文件无扩展名时传入）

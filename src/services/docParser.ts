@@ -2,26 +2,29 @@ import fs from 'fs'
 import path from 'path'
 import { TextEncoder, TextDecoder } from 'util'
 
+// ✨ 修复 pdfjs-dist 在 Node.js 环境中的各种兼容性问题
 if (typeof globalThis !== 'undefined') {
-  if (!globalThis.TextEncoder) globalThis.TextEncoder = TextEncoder
-  if (!globalThis.TextDecoder) globalThis.TextDecoder = TextDecoder
-  if (!globalThis.DOMMatrix) {
-    globalThis.DOMMatrix = class DOMMatrix {
+  const g = globalThis as any
+  
+  if (!g.TextEncoder) g.TextEncoder = TextEncoder
+  if (!g.TextDecoder) g.TextDecoder = TextDecoder
+  if (!g.DOMMatrix) {
+    g.DOMMatrix = class DOMMatrix {
       constructor(public data: number[] = []) {}
-    } as any
+    }
   }
-  if (!globalThis.ImageData) {
-    globalThis.ImageData = class ImageData {
+  if (!g.ImageData) {
+    g.ImageData = class ImageData {
       constructor(public data: Uint8ClampedArray, public width: number, public height: number) {}
-    } as any
+    }
   }
-  if (!globalThis.Path2D) {
-    globalThis.Path2D = class Path2D {} as any
+  if (!g.Path2D) {
+    g.Path2D = class Path2D {}
   }
 }
 
 // 修复 process.getBuiltinModule 不存在的问题
-if (typeof process !== 'undefined' && !process.getBuiltinModule) {
+if (typeof process !== 'undefined' && !(process as any).getBuiltinModule) {
   (process as any).getBuiltinModule = (id: string) => {
     try {
       return require(id)
