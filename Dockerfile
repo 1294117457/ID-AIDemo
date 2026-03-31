@@ -14,6 +14,7 @@ RUN npm config set registry https://registry.npmmirror.com/
 COPY package.json ./
 
 # 4. 使用标准的 npm 安装，确保 better-sqlite3 完美编译出真实的 .node 物理文件
+RUN npm install
 RUN npm rebuild better-sqlite3 --build-from-source
 
 # 5. 拷贝所有代码并编译 TS
@@ -21,6 +22,9 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY data ./data
 COPY docs ./docs
+
+# ✨ 关键修复：全局安装 typescript 确保 tsc 命令可用
+RUN npm install -g typescript
 RUN npm run build
 
 # 6. 运行时建好临时目录
