@@ -14,7 +14,7 @@ RUN npm config set registry https://registry.npmmirror.com/
 COPY package.json ./
 
 # 4. 使用标准的 npm 安装，确保 better-sqlite3 完美编译出真实的 .node 物理文件
-RUN npm install
+RUN npm rebuild better-sqlite3 --build-from-source
 
 # 5. 拷贝所有代码并编译 TS
 COPY tsconfig.json ./
