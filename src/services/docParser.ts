@@ -1,6 +1,35 @@
 import fs from 'fs'
 import path from 'path'
+import { TextEncoder, TextDecoder } from 'util'
 
+if (typeof globalThis !== 'undefined') {
+  if (!globalThis.TextEncoder) globalThis.TextEncoder = TextEncoder
+  if (!globalThis.TextDecoder) globalThis.TextDecoder = TextDecoder
+  if (!globalThis.DOMMatrix) {
+    globalThis.DOMMatrix = class DOMMatrix {
+      constructor(public data: number[] = []) {}
+    } as any
+  }
+  if (!globalThis.ImageData) {
+    globalThis.ImageData = class ImageData {
+      constructor(public data: Uint8ClampedArray, public width: number, public height: number) {}
+    } as any
+  }
+  if (!globalThis.Path2D) {
+    globalThis.Path2D = class Path2D {} as any
+  }
+}
+
+// 修复 process.getBuiltinModule 不存在的问题
+if (typeof process !== 'undefined' && !process.getBuiltinModule) {
+  (process as any).getBuiltinModule = (id: string) => {
+    try {
+      return require(id)
+    } catch {
+      return null
+    }
+  }
+}
 /** 将文件解析为纯文本，不支持的格式返回空字符串
  * @param filePath    实际文件路径
  * @param hintExt     可选：原始文件扩展名（multer 临时文件无扩展名时传入）
