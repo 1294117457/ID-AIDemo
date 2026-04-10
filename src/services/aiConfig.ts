@@ -1,14 +1,17 @@
 import { getDb } from '../db/init.js'
 
-// 内存缓存，避免每次 LLM 调用都查 SQLite
+// 内存缓存 + TTL，MCP 子进程也能在 TTL 过期后读到最新配置
 let _cache: Record<string, string> | null = null
+let _cacheTime = 0
+const CACHE_TTL = 60_000
 
 function loadAll(): Record<string, string> {
-  if (_cache) return _cache
+  if (_cache && Date.now() - _cacheTime < CACHE_TTL) return _cache
   const rows = getDb()
     .prepare('SELECT config_key, config_value FROM ai_config')
     .all() as { config_key: string; config_value: string }[]
   _cache = Object.fromEntries(rows.map(r => [r.config_key, r.config_value]))
+  _cacheTime = Date.now()
   return _cache
 }
 

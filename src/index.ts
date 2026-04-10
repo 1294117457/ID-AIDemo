@@ -39,6 +39,7 @@ async function main(): Promise<void> {
     console.log('  POST /chat/stream        (旧-流式)')
     console.log('  POST /chat/clear')
     console.log('  GET  /knowledge/list')
+    console.log('  GET  /knowledge/stats')
     console.log('  POST /knowledge/upload')
     console.log('  DEL  /knowledge/:sourceFile')
     console.log('  POST /analyze/certificate')
