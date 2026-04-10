@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise'
-import type { ScoreTemplate } from '../services/analyzeChain.js'
+import type { ScoreTemplate } from '../types/scoreTemplate.js'
 
 let pool: mysql.Pool | null = null
 

@@ -3,25 +3,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { getEmbedding } from './embeddings.js'
 import { searchSimilar } from './vectorStore.js'
 import { getApiKey, getBaseUrl, getChatModel } from './aiConfig.js'
-
-// ---------- 类型定义（与 idbackend ScoreTemplateDto / ScoreTemplateRuleDto 对齐）----------
-
-export interface TemplateRule {
-  id: number
-  ruleName: string
-  ruleScore: number
-  description?: string
-}
-
-export interface ScoreTemplate {
-  id: number
-  templateName: string
-  templateType: string   // CONDITION | TRANSFORM
-  scoreType: number
-  templateMaxScore?: number
-  description?: string
-  rules: TemplateRule[]
-}
+import type { ScoreTemplate } from '../types/scoreTemplate.js'
 
 export interface AnalyzeSuggestion {
   templateId: number

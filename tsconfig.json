@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "NodeNext",
-    "lib": ["ES2020"],
-    "moduleResolution": "nodenext",
+    "target": "ES2022",           // 编译目标版本，Node.js 18+ 完美支持 ES2022
+    "module": "ESNext",           // 使用现代的 ES Modules (import/export)
+    "moduleResolution": "node", 
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,

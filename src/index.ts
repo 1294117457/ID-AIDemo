@@ -7,6 +7,7 @@ import chatRouter from './routes/chat.js'
 import knowledgeRouter from './routes/knowledge.js'
 import analyzeRouter from './routes/analyze.js'
 import configRouter from './routes/config.js'
+import agentRouter from './routes/agent.js'
 
 const app = express()
 app.use(cors())
@@ -21,6 +22,7 @@ app.use('/chat', chatRouter)
 app.use('/knowledge', knowledgeRouter)
 app.use('/analyze', analyzeRouter)
 app.use('/config', configRouter)
+app.use('/agent', agentRouter)
 
 const PORT = Number(process.env.PORT ?? 3001)
 
@@ -41,6 +43,8 @@ async function main(): Promise<void> {
     console.log('  POST /analyze/generate')
     console.log('  GET  /config')
     console.log('  PUT  /config')
+    console.log('  POST /agent/chat')
+    console.log('  POST /agent/resume')
   })
 }
 
