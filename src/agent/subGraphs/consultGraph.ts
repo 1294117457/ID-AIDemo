@@ -1,11 +1,8 @@
-// ID-AIDemo/src/agents/subgraphs/consultGraph.ts
-
 import { ChatOpenAI } from '@langchain/openai'
 import { ConsultState, ConsultStateType } from '../state.js'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { StateGraph, START, END } from '@langchain/langgraph'
-import { getEmbedding } from '../../services/embeddings.js'
-import { searchSimilar } from '../../services/vectorStore.js'
+import { callTool } from '../../mcp/mcpClient.js'
 import { getApiKey, getBaseUrl, getChatModel, getSystemRole } from '../../services/aiConfig.js'
 
 async function retrieveNode(state: ConsultStateType): Promise<Partial<ConsultStateType>> {
@@ -13,12 +10,7 @@ async function retrieveNode(state: ConsultStateType): Promise<Partial<ConsultSta
   const userMsg = state.messages.filter(m => m instanceof HumanMessage).at(-1)!
   const query = String(userMsg.content)
 
-  const queryVec = await getEmbedding(query)
-  const chunks = searchSimilar(queryVec, 5)
-
-  const retrievedContext = chunks.length > 0
-    ? chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
-    : '（知识库暂无相关内容）'
+  const retrievedContext = await callTool('search_knowledge', { query, topK: 5 })
 
   return { retrievedContext }
 }

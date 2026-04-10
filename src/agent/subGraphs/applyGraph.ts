@@ -1,23 +1,17 @@
-// ID-AIDemo/src/agents/subgraphs/applyGraph.ts
-
 import { ChatOpenAI } from '@langchain/openai'
 import { ApplyState, ApplyStateType } from '../state.js'
 import { StateGraph, START, END } from '@langchain/langgraph'
 import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import { getEmbedding } from '../../services/embeddings.js'
-import { searchSimilar } from '../../services/vectorStore.js'
+import { callTool } from '../../mcp/mcpClient.js'
 import { getApiKey, getBaseUrl, getChatModel } from '../../services/aiConfig.js'
 
-// ─── 节点1：检索相关政策 ───
-// 逻辑搬自 ID-AIDemo/src/services/analyzeChain.ts 第 68-74 行
 async function fetchPolicyNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log("--apply:fetchPolicy")
-  const queryVec = await getEmbedding(state.documentText.slice(0, 512))
-  const chunks = searchSimilar(queryVec, 5)
-  const policyContext = chunks.length > 0
-    ? chunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
-    : '（知识库暂无相关政策）'
+  const policyContext = await callTool('search_knowledge', {
+    query: state.documentText.slice(0, 512),
+    topK: 5,
+  })
   return { policyContext }
 }
 

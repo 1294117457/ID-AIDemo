@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import { initDb } from './db/init.js'
 import { seedKnowledge } from './seed/seedKnowledge.js'
+import { closeMcpClient } from './mcp/mcpClient.js'
 import chatRouter from './routes/chat.js'
 import knowledgeRouter from './routes/knowledge.js'
 import analyzeRouter from './routes/analyze.js'
@@ -34,7 +35,8 @@ async function main(): Promise<void> {
     console.log(`[agent] 运行中 → http://localhost:${PORT}`)
     console.log('[agent] 接口列表:')
     console.log('  GET  /health')
-    console.log('  POST /chat/send')
+    console.log('  POST /chat/send          (旧-非流式)')
+    console.log('  POST /chat/stream        (旧-流式)')
     console.log('  POST /chat/clear')
     console.log('  GET  /knowledge/list')
     console.log('  POST /knowledge/upload')
@@ -43,12 +45,20 @@ async function main(): Promise<void> {
     console.log('  POST /analyze/generate')
     console.log('  GET  /config')
     console.log('  PUT  /config')
-    console.log('  POST /agent/chat')
-    console.log('  POST /agent/resume')
+    console.log('  POST /agent/chat          (新-非流式)')
+    console.log('  POST /agent/stream        (新-流式SSE)')
+    console.log('  POST /agent/resume        (新-interrupt恢复)')
+    console.log('  POST /agent/resume-stream (新-interrupt恢复流式)')
   })
 }
 
 main().catch(err => {
   console.error('[agent] 启动失败:', err)
   process.exit(1)
+})
+
+process.on('SIGINT', async () => {
+  console.log('\n[agent] 正在关闭...')
+  await closeMcpClient()
+  process.exit(0)
 })

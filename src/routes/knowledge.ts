@@ -3,9 +3,8 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { parseFile, chunkText } from '../services/docParser.js'
-import { getEmbeddings } from '../services/embeddings.js'
-import { saveChunk, deleteBySourceFile, listSources, sourceFileExists } from '../services/vectorStore.js'
+import { callTool } from '../mcp/mcpClient.js'
+import { listSources, deleteBySourceFile } from '../services/vectorStore.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
@@ -57,29 +56,24 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   const filePath = req.file.path
 
   try {
-    // 若已存在则先删除旧向量
-    if (sourceFileExists(fileName)) {
-      deleteBySourceFile(fileName)
-    }
-
-    const text = await parseFile(filePath)
-    if (!text.trim()) {
+    // Step 1: 通过 MCP 解析文档
+    const parseResult = await callTool('parse_document', { filePath, ext: path.extname(fileName).toLowerCase() })
+    const text = parseResult
+    if (!text.trim() || text === '（文件解析结果为空）') {
       res.json({ code: 400, msg: '文件内容为空或无法解析', data: null })
       return
     }
 
-    const chunks = chunkText(text, 500, 100)
-    const embeddings = await getEmbeddings(chunks)
-    for (let i = 0; i < chunks.length; i++) {
-      saveChunk(fileName, i, chunks[i]!, embeddings[i]!)
-    }
+    // Step 2: 通过 MCP 分块+入库
+    const ingestResult = await callTool('ingest_document', { sourceFile: fileName, text })
+    const chunkMatch = ingestResult.match(/共 (\d+) 个分块/)
+    const chunkCount = chunkMatch ? parseInt(chunkMatch[1]) : 0
 
-    res.json({ code: 200, msg: '上传成功', data: { fileName, chunkCount: chunks.length } })
+    res.json({ code: 200, msg: '上传成功', data: { fileName, chunkCount } })
   } catch (err) {
     console.error('[knowledge/upload]', err)
     res.json({ code: 500, msg: `处理失败: ${String(err)}`, data: null })
   } finally {
-    // 清理临时上传文件
     fs.unlink(filePath, () => { /* ignore */ })
   }
 })

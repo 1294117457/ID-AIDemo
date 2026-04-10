@@ -1,15 +1,13 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
 
-# Environment variables
+# Environment
 .env
 .env.local
 .env.*.local
 
-# Build output
+# Build
 dist/
-build/
 *.tsbuildinfo
 
 # IDE
@@ -18,46 +16,21 @@ build/
 *.swp
 *.swo
 *~
-.DS_Store
+*.code-workspace
 
 # Logs
 logs/
 *.log
-npm-debug.log*
-pnpm-debug.log*
 
-# Runtime data
-# data/
+# Runtime
 uploads/
+data/*.db
 
 # OS
-Thumbs.db
 .DS_Store
+Thumbs.db
 
-# Temporary files
+# Temp
 temp/
 tmp/
 *.tmp
-
-# Database files (if using SQLite)
-*.db
-*.sqlite
-*.sqlite3
-
-# PDF and document processing temp files
-*.pdf.tmp
-
-# Test coverage
-coverage/
-.nyc_output/
-
-# IDE temp files
-*.code-workspace
-.vscode-test/
-node_modules
-dist
-.vscode
-.git
-npm-debug.log*
-.env
-/node_modules/
