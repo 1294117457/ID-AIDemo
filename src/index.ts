@@ -2,8 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import { initDb } from './db/init.js'
-import { seedKnowledge } from './seed/seedKnowledge.js'
-import { closeMcpClient } from './mcp/mcpClient.js'
+import { initKnowledge } from './services/knowledgeManager.js'
 import chatRouter from './routes/chat.js'
 import knowledgeRouter from './routes/knowledge.js'
 import analyzeRouter from './routes/analyze.js'
@@ -30,7 +29,7 @@ const PORT = Number(process.env.PORT ?? 3001)
 async function main(): Promise<void> {
   console.log('[agent] 启动中...')
   initDb()
-  await seedKnowledge()
+  await initKnowledge()
   app.listen(PORT, () => {
     console.log(`[agent] 运行中 → http://localhost:${PORT}`)
     console.log('[agent] 接口列表:')
@@ -58,8 +57,4 @@ main().catch(err => {
   process.exit(1)
 })
 
-process.on('SIGINT', async () => {
-  console.log('\n[agent] 正在关闭...')
-  await closeMcpClient()
-  process.exit(0)
-})
+process.on('SIGINT', () => { process.exit(0) })

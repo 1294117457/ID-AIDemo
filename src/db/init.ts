@@ -18,14 +18,6 @@ export function initDb(): void {
   _db = new Database(DB_PATH)
 
   _db.exec(`
-    CREATE TABLE IF NOT EXISTS knowledge_chunks (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      source_file TEXT    NOT NULL,
-      chunk_index INTEGER NOT NULL,
-      content     TEXT    NOT NULL,
-      embedding   TEXT    NOT NULL,
-      created_at  INTEGER NOT NULL DEFAULT (unixepoch())
-    );
 
     CREATE TABLE IF NOT EXISTS conversations (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +27,6 @@ export function initDb(): void {
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
-    CREATE INDEX IF NOT EXISTS idx_chunks_source  ON knowledge_chunks(source_file);
     CREATE INDEX IF NOT EXISTS idx_conv_session   ON conversations(session_id, created_at);
 
     CREATE TABLE IF NOT EXISTS ai_config (

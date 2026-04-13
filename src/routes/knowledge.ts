@@ -4,7 +4,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { callTool } from '../mcp/mcpClient.js'
-import { listSources, deleteBySourceFile, totalChunks } from '../services/vectorStore.js'
+import { ingestFile, removeSource, listSources, getStats } from '../services/knowledgeManager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
@@ -48,12 +48,7 @@ router.get('/list', (_req, res) => {
 /** GET /knowledge/stats — 知识库统计（文件列表 + 分块总数） */
 router.get('/stats', (_req, res) => {
   try {
-    const sources = listSources()
-    const total = totalChunks()
-    res.json({
-      code: 200, msg: '成功',
-      data: { totalFiles: sources.length, totalChunks: total, files: sources }
-    })
+    res.json({ code: 200, msg: '成功', data: getStats() })
   } catch (err) {
     console.error('[knowledge/stats]', err)
     res.json({ code: 500, msg: '查询失败', data: null })
@@ -69,27 +64,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
   const fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
   const filePath = req.file.path
-
+  const ext = path.extname(fileName).toLowerCase()
+  
   try {
-    // Step 1: 通过 MCP 解析文档
-    const parseResult = await callTool('parse_document', { filePath, ext: path.extname(fileName).toLowerCase() })
-    const text = parseResult
-    console.log(`[knowledge/upload] 解析完成: ${fileName}, 文本长度=${text.length}`)
-
-    if (!text.trim() || text === '（文件解析结果为空）') {
-      res.json({ code: 400, msg: '文件内容为空或无法解析', data: { fileName, status: 'parse_empty' } })
+    // const result = await ingestFile(filePath, fileName)
+    const result = await ingestFile(filePath, fileName,ext)
+    if (result.chunkCount === 0) {
+      res.json({ code: 400, msg: '文件内容为空', data: { fileName, status: 'parse_empty' } })
       return
     }
 
-    // Step 2: 通过 MCP 分块+入库
-    const ingestResult = await callTool('ingest_document', { sourceFile: fileName, text })
-    console.log(`[knowledge/upload] 入库完成: ${fileName}, result=${ingestResult}`)
-    const chunkMatch = ingestResult.match(/共 (\d+) 个分块/)
-    const chunkCount = chunkMatch ? parseInt(chunkMatch[1]) : 0
-
     res.json({
       code: 200, msg: '上传成功',
-      data: { fileName, chunkCount, textLength: text.length, status: 'success' }
+      data: { fileName, chunkCount: result.chunkCount, textLength: result.textLength, status: 'success' }
     })
   } catch (err) {
     console.error('[knowledge/upload] 完整错误:', err)
@@ -101,14 +88,14 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 })
 
 /** DELETE /knowledge/:sourceFile */
-router.delete('/:sourceFile', (req, res) => {
+router.delete('/:sourceFile', async (req, res) => {
   const sourceFile = decodeURIComponent(req.params['sourceFile'] ?? '')
   if (!sourceFile) {
     res.json({ code: 400, msg: '缺少 sourceFile', data: null })
     return
   }
   try {
-    deleteBySourceFile(sourceFile)
+    await removeSource(sourceFile)
     res.json({ code: 200, msg: '删除成功', data: null })
   } catch (err) {
     console.error('[knowledge/delete]', err)

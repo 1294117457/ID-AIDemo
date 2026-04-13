@@ -2,6 +2,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages'
 import { getEmbedding } from './embeddings.js'
 import { searchSimilar } from './vectorStore.js'
+import {} from './knowledgeManager.js'
 import { getDb } from '../db/init.js'
 import { getApiKey, getBaseUrl, getChatModel, getSystemRole } from './aiConfig.js'
 

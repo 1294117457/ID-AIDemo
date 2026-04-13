@@ -3,7 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { parseFile } from '../services/docParser.js'
+import { parseFileToText } from '../services/knowledgeManager.js'
 import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../agent/mainGraph.js'
 import { fetchTemplatesFromDb } from '../db/mysql.js'
 import type { ScoreTemplate } from '../types/scoreTemplate.js'
@@ -31,7 +31,7 @@ async function parseAgentParams(req: Request) {
   if (req.file) {
     const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
     const hintExt = path.extname(originalName).toLowerCase()
-    documentText = await parseFile(req.file.path, hintExt)
+    documentText = await parseFileToText(req.file.path, hintExt)
     fs.unlink(req.file.path, () => {})
   }
 

@@ -3,15 +3,12 @@ import { ApplyState, ApplyStateType } from '../state.js'
 import { StateGraph, START, END } from '@langchain/langgraph'
 import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import { callTool } from '../../mcp/mcpClient.js'
+import { searchKnowledge } from '../../services/knowledgeManager.js'
 import { getApiKey, getBaseUrl, getChatModel } from '../../services/aiConfig.js'
 
 async function fetchPolicyNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log("--apply:fetchPolicy")
-  const policyContext = await callTool('search_knowledge', {
-    query: state.documentText.slice(0, 512),
-    topK: 5,
-  })
+  const policyContext = await searchKnowledge(state.documentText.slice(0, 512), 5)
   return { policyContext }
 }
 

@@ -2,7 +2,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { ConsultState, ConsultStateType } from '../state.js'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { StateGraph, START, END } from '@langchain/langgraph'
-import { callTool } from '../../mcp/mcpClient.js'
+import { searchKnowledge } from '../../services/knowledgeManager.js'
 import { getApiKey, getBaseUrl, getChatModel, getSystemRole } from '../../services/aiConfig.js'
 
 async function retrieveNode(state: ConsultStateType): Promise<Partial<ConsultStateType>> {
@@ -10,7 +10,7 @@ async function retrieveNode(state: ConsultStateType): Promise<Partial<ConsultSta
   const userMsg = state.messages.filter(m => m instanceof HumanMessage).at(-1)!
   const query = String(userMsg.content)
 
-  const retrievedContext = await callTool('search_knowledge', { query, topK: 5 })
+  const retrievedContext = await searchKnowledge(query, 5)
 
   return { retrievedContext }
 }
