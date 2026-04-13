@@ -8,31 +8,9 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { parseFileToText, searchKnowledge } from '../../services/knowledgeManager.js'
 import { getApiKey, getBaseUrl, getChatModel } from '../../services/aiConfig.js'
 import type { ScoreTemplate } from '../../types/scoreTemplate.js'
+import {createChatModel} from '../../services/llmService.js'
+import {upload} from '../../common/upload.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
-fs.mkdirSync(UPLOAD_DIR, { recursive: true })
-
-const upload = multer({
-  dest: UPLOAD_DIR,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(
-      Buffer.from(file.originalname, 'latin1').toString('utf8')
-    ).toLowerCase()
-    if (ext === '.pdf') cb(null, true)
-    else cb(new Error('证明材料只支持 PDF 格式'))
-  }
-})
-
-function createModel(temperature = 0.1) {
-  return new ChatOpenAI({
-    apiKey: getApiKey(),
-    configuration: { baseURL: getBaseUrl() },
-    modelName: getChatModel(),
-    temperature,
-  })
-}
 
 function extractJsonArray(text: string): string {
   const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
@@ -86,7 +64,7 @@ router.post('/certificate', upload.single('file'), async (req, res) => {
       rules: t.rules.map(r => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
     }))
 
-    const response = await createModel().invoke([
+    const response = await createChatModel().invoke([
       new SystemMessage(
         '你是厦门大学信息学院推免加分审核专家。只输出 JSON 数组，不要任何解释文字，不要 markdown 代码块。'
       ),
@@ -168,7 +146,7 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
-    const response = await createModel().invoke([
+    const response = await createChatModel().invoke([
       new SystemMessage(
         '你是厦门大学信息学院推免加分申请助手。根据证明材料内容生成申请备注。只输出备注文本本身，不超过100字，不含任何其他内容。'
       ),

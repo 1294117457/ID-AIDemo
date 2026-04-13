@@ -12,21 +12,11 @@ import { getApiKey, getBaseUrl, getEmbeddingModel } from './aiConfig.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import {createEmbeddings} from './llmService.js'
+
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const KNOWLEDGE_DIR = path.resolve(__dirname, '../../docs/0加分文件')
-
-function createEmbeddings(){
-    return new OpenAIEmbeddings({
-        openAIApiKey: getApiKey(),
-        configuration: {
-            baseURL: getBaseUrl()
-        },
-        modelName: getEmbeddingModel(),
-        batchSize: 6,
-        maxRetries: 3,
-    })
-}   
 
 const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 500,

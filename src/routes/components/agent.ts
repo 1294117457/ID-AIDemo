@@ -4,18 +4,10 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { parseFileToText } from '../../services/knowledgeManager.js'
-import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../../agent/mainGraph.js'
+import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../../services/agentService.js'
 import type { ScoreTemplate } from '../../types/scoreTemplate.js'
 import type { Request, Response } from 'express'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
-fs.mkdirSync(UPLOAD_DIR, { recursive: true })
-
-const upload = multer({
-  dest: UPLOAD_DIR,
-  limits: { fileSize: 10 * 1024 * 1024 },
-})
+import {upload} from '../../common/upload.js'
 
 const router = Router()
 

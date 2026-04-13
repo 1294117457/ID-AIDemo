@@ -5,6 +5,10 @@ import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages
 import { z } from 'zod'
 import { searchKnowledge } from '../../services/knowledgeManager.js'
 import { getApiKey, getBaseUrl, getChatModel } from '../../services/aiConfig.js'
+import {ANALYZE_SYSTEM,analyzeUserPrompt} from '../prompts.js'
+import {createChatModel} from '../../services/llmService.js'
+
+
 
 async function fetchPolicyNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log("--apply:fetchPolicy")
@@ -38,29 +42,11 @@ async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<Apply
     rules: t.rules.map(r => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
   }))
 
-  const model = new ChatOpenAI({
-    apiKey: getApiKey(),
-    configuration: { baseURL: getBaseUrl() },
-    modelName: getChatModel(),
-    temperature: 0.1,
-  }).withStructuredOutput(SuggestionSchema)
+  const model = createChatModel(0.1).withStructuredOutput(SuggestionSchema)
 
   const result = await model.invoke([
-    new SystemMessage('你是厦门大学信息学院推免加分审核专家。分析证明材料，判断可以申请哪些加分项。如果无匹配返回空数组。'),
-    new HumanMessage(`学生上传了以下证明材料：
----
-${state.documentText.slice(0, 2000)}
----
-
-可申请的加分模板列表：
-${JSON.stringify(templatesForPrompt, null, 2)}
-
-相关加分政策参考：
-${state.policyContext}
-
-请分析证明材料，判断学生可以申请哪些加分项。`),
-  ])
-
+    new SystemMessage(ANALYZE_SYSTEM),
+    new HumanMessage(analyzeUserPrompt(state.documentText.slice(0, 2000),JSON.stringify(templatesForPrompt, null, 2),state.policyContext)),])
   return { checkResults: result.suggestions.map(s => JSON.stringify(s)) }
 }
 

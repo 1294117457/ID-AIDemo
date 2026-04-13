@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { ingestFile, removeSource, listSources, getStats } from '../../services/knowledgeManager.js'
 
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
