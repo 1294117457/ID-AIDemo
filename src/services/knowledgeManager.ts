@@ -14,7 +14,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const KNOWLEDGE_DIR = path.resolve(__dirname, '../../docs/加分文件')
+const KNOWLEDGE_DIR = path.resolve(__dirname, '../../docs/0加分文件')
 
 function createEmbeddings(){
     return new OpenAIEmbeddings({
@@ -23,6 +23,8 @@ function createEmbeddings(){
             baseURL: getBaseUrl()
         },
         modelName: getEmbeddingModel(),
+        batchSize: 6,
+        maxRetries: 3,
     })
 }   
 
@@ -69,9 +71,11 @@ async function loadFile(filePath: string, hintExt?: string): Promise<Document[]>
       loader = new PDFLoader(filePath)
       break
     case '.docx':
-    case '.doc':
       loader = new DocxLoader(filePath)
       break
+    case '.doc':
+      console.warn(`[knowledge] .doc 格式不受支持（仅支持 .docx），跳过: ${filePath}`)
+      return []
     case '.csv':
       loader = new CSVLoader(filePath)
       break
@@ -98,7 +102,7 @@ export async function initKnowledge(): Promise<void> {
     return
   }
 
-  const SUPPORTED = new Set(['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.md', '.txt'])
+  const SUPPORTED = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.md', '.txt'])
   const files = fs.readdirSync(KNOWLEDGE_DIR).filter(f => {
     const ext = path.extname(f).toLowerCase()
     return SUPPORTED.has(ext) && !f.startsWith('~$')
