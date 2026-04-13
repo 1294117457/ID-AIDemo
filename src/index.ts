@@ -13,7 +13,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
-app.use('/api', apiRouter) 
+app.use('/', apiRouter)
 const PORT = Number(process.env.PORT ?? 3001)
 
 async function main(): Promise<void> {
