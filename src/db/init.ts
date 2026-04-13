@@ -18,17 +18,6 @@ export function initDb(): void {
   _db = new Database(DB_PATH)
 
   _db.exec(`
-
-    CREATE TABLE IF NOT EXISTS conversations (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT    NOT NULL,
-      role       TEXT    NOT NULL,
-      content    TEXT    NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_conv_session   ON conversations(session_id, created_at);
-
     CREATE TABLE IF NOT EXISTS ai_config (
       config_key   TEXT PRIMARY KEY,
       config_value TEXT NOT NULL,

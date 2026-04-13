@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { parseFileToText } from '../services/knowledgeManager.js'
 import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../agent/mainGraph.js'
-import { fetchTemplatesFromDb } from '../db/mysql.js'
 import type { ScoreTemplate } from '../types/scoreTemplate.js'
 import type { Request, Response } from 'express'
 
@@ -43,10 +42,6 @@ async function parseAgentParams(req: Request) {
       templates = Array.isArray(parsed) ? (parsed as ScoreTemplate[]) : []
     } catch { /* ignore */ }
   }
-  if (templates.length === 0) {
-    templates = await fetchTemplatesFromDb()
-  }
-
   return { message: message.trim(), sessionId, documentText, templates }
 }
 

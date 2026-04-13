@@ -3,21 +3,19 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { parseFile } from '../services/docParser.js'
-import {
-  analyzeCertificate,
-  generateApplicationRemark,
-  type ScoreTemplate
-} from '../services/analyzeChain.js'
+import { ChatOpenAI } from '@langchain/openai'
+import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { parseFileToText, searchKnowledge } from '../services/knowledgeManager.js'
+import { getApiKey, getBaseUrl, getChatModel } from '../services/aiConfig.js'
+import type { ScoreTemplate } from '../types/scoreTemplate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
-// 证明材料只接受 PDF，使用随机临时文件名（用完即删）
 const upload = multer({
   dest: UPLOAD_DIR,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(
       Buffer.from(file.originalname, 'latin1').toString('utf8')
@@ -27,16 +25,31 @@ const upload = multer({
   }
 })
 
+function createModel(temperature = 0.1) {
+  return new ChatOpenAI({
+    apiKey: getApiKey(),
+    configuration: { baseURL: getBaseUrl() },
+    modelName: getChatModel(),
+    temperature,
+  })
+}
+
+function extractJsonArray(text: string): string {
+  const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  if (codeBlock?.[1]) return codeBlock[1].trim()
+  const arrayMatch = text.match(/\[[\s\S]*\]/)
+  if (arrayMatch) return arrayMatch[0]
+  return text.trim()
+}
+
 const router = Router()
 
 /**
  * POST /analyze/certificate
  *
- * 分析证明材料 PDF，对照加分模板列表，返回可申请的加分项推荐。
- *
  * Body (multipart/form-data):
  *   file      : PDF 文件
- *   templates : JSON 字符串，ScoreTemplate[] 列表（由 idbackend 传入，可选）
+ *   templates : JSON 字符串，ScoreTemplate[] 列表（由 idbackend 传入）
  */
 router.post('/certificate', upload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -47,58 +60,89 @@ router.post('/certificate', upload.single('file'), async (req, res) => {
   const filePath = req.file.path
   const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
   const hintExt = path.extname(originalName).toLowerCase() || '.pdf'
-  process.stdout.write(`[CERT_ROUTE] file=${filePath} ext=${hintExt} originalName=${originalName}\n`)
 
   try {
-    // 1. 解析 PDF 文本（传入原始扩展名，multer 临时文件无扩展名）
-    process.stdout.write(`[analyze] parsing file: ${filePath}, hintExt: ${hintExt}\n`)
-    const certificateText = await parseFile(filePath, hintExt)
-    process.stdout.write(`[analyze] certificateText length: ${certificateText.length}\n`)
+    const certificateText = await parseFileToText(filePath, hintExt)
     if (!certificateText.trim()) {
-      res.json({ code: 400, msg: 'PDF 内容为空或无法解析_v2', data: null })
+      res.json({ code: 400, msg: 'PDF 内容为空或无法解析', data: null })
       return
     }
 
-    // 2. 解析模板列表（由 idbackend 传入）
     let templates: ScoreTemplate[] = []
     const templatesRaw = req.body['templates'] as string | undefined
     if (templatesRaw) {
       try {
         const parsed: unknown = JSON.parse(templatesRaw)
         templates = Array.isArray(parsed) ? (parsed as ScoreTemplate[]) : []
-      } catch {
-        console.warn('[analyze/certificate] templates 字段解析失败，将以空模板列表继续分析')
-      }
+      } catch { /* ignore */ }
     }
-    // 3. AI 分析
-    const suggestions = await analyzeCertificate(certificateText, templates)
+
+    const policyContext = await searchKnowledge(certificateText.slice(0, 512), 5)
+
+    const templatesForPrompt = templates.map(t => ({
+      id: t.id,
+      templateName: t.templateName,
+      templateType: t.templateType,
+      rules: t.rules.map(r => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
+    }))
+
+    const response = await createModel().invoke([
+      new SystemMessage(
+        '你是厦门大学信息学院推免加分审核专家。只输出 JSON 数组，不要任何解释文字，不要 markdown 代码块。'
+      ),
+      new HumanMessage(`学生上传了以下证明材料：
+---
+${certificateText.slice(0, 2000)}
+---
+
+可申请的加分模板列表：
+${JSON.stringify(templatesForPrompt, null, 2)}
+
+相关加分政策参考：
+${policyContext}
+
+请分析证明材料，判断学生可以申请哪些加分项。
+以纯 JSON 数组格式输出，每个元素字段名必须完全一致：
+[
+  {
+    "templateId": 数字,
+    "templateName": "模板名称",
+    "ruleId": 数字,
+    "ruleName": "规则名称",
+    "estimatedScore": 数字,
+    "reason": "一句话说明匹配理由，不超过50字"
+  }
+]
+如果无任何匹配，返回 []`)
+    ])
+
+    let suggestions: any[] = []
+    try {
+      const jsonStr = extractJsonArray(String(response.content))
+      const parsed = JSON.parse(jsonStr)
+      if (Array.isArray(parsed)) suggestions = parsed
+    } catch {
+      console.error('[analyze/certificate] JSON 解析失败:', String(response.content).slice(0, 300))
+    }
 
     res.json({
       code: 200,
       msg: '成功',
-      data: {
-        certificateText: certificateText.slice(0, 3000), // 截断，用于后续 generate 步骤
-        suggestions
-      }
+      data: { certificateText: certificateText.slice(0, 3000), suggestions }
     })
   } catch (err) {
     console.error('[analyze/certificate]', err)
     res.json({ code: 500, msg: `分析失败: ${String(err)}`, data: null })
   } finally {
-    fs.unlink(filePath, () => { /* 清理临时文件 */ })
+    fs.unlink(filePath, () => {})
   }
 })
 
 /**
  * POST /analyze/generate
  *
- * 根据学生选定的模板和规则，生成申请表单预填数据（remark + 分数字段）。
- *
  * Body (application/json):
- *   certificateText    : 上一步 certificate 返回的原文
- *   selectedTemplateId : 学生选择的 templateId
- *   selectedRuleId     : 学生选择的 ruleId
- *   template           : 完整的 ScoreTemplate 对象（由 idbackend 传入）
+ *   certificateText, selectedTemplateId, selectedRuleId, template
  */
 router.post('/generate', async (req, res) => {
   const { certificateText, selectedTemplateId, selectedRuleId, template } = req.body as {
@@ -124,24 +168,28 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
-    const remark = await generateApplicationRemark(
-      certificateText,
-      template.templateName,
-      selectedRule.ruleName,
-      selectedRule.ruleScore
-    )
+    const response = await createModel().invoke([
+      new SystemMessage(
+        '你是厦门大学信息学院推免加分申请助手。根据证明材料内容生成申请备注。只输出备注文本本身，不超过100字，不含任何其他内容。'
+      ),
+      new HumanMessage(`证明材料内容：
+${certificateText.slice(0, 1500)}
+
+学生选择申请：${template.templateName} - ${selectedRule.ruleName}（预计 ${selectedRule.ruleScore} 分）
+
+请生成简洁的申请备注，描述证明材料的关键信息（比赛/论文名称、获奖/发表等级、时间等）。`)
+    ])
 
     res.json({
       code: 200,
       msg: '成功',
       data: {
-        // 与 idbackend ScoreApplicationIDTO 字段对齐，供前端直接填入申请表单
         templateName: template.templateName,
         templateType: template.templateType,
         scoreType: template.scoreType,
         applyScore: selectedRule.ruleScore,
         ruleId: selectedRuleId,
-        remark
+        remark: String(response.content).trim()
       }
     })
   } catch (err) {

@@ -12,9 +12,6 @@ async function fetchPolicyNode(state: ApplyStateType): Promise<Partial<ApplyStat
   return { policyContext }
 }
 
-// ─── 节点2：模板匹配分析 ───
-// prompt 搬自 ID-AIDemo/src/services/analyzeChain.ts 第 85-112 行
-// 但用 withStructuredOutput 替代旧的手动 JSON.parse
 const SuggestionSchema = z.object({
   suggestions: z.array(z.object({
     templateId: z.number(),
@@ -34,8 +31,6 @@ async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<Apply
     return { checkResults: ['{"error":"无可用加分模板"}'] }
   }
 
-  // 精简模板结构，减少 token 消耗
-  // 搬自 ID-AIDemo/src/services/analyzeChain.ts 第 77-82 行
   const templatesForPrompt = state.templates.map(t => ({
     id: t.id,
     templateName: t.templateName,
@@ -50,8 +45,6 @@ async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<Apply
     temperature: 0.1,
   }).withStructuredOutput(SuggestionSchema)
 
-  // prompt 搬自 ID-AIDemo/src/services/analyzeChain.ts 第 89-112 行
-  // 但去掉了"只输出JSON"的指令（因为 withStructuredOutput 自动处理）
   const result = await model.invoke([
     new SystemMessage('你是厦门大学信息学院推免加分审核专家。分析证明材料，判断可以申请哪些加分项。如果无匹配返回空数组。'),
     new HumanMessage(`学生上传了以下证明材料：
@@ -71,8 +64,6 @@ ${state.policyContext}
   return { checkResults: result.suggestions.map(s => JSON.stringify(s)) }
 }
 
-// ─── 节点3：汇总回复 ───
-// 保留你 demo 的 summarizeNode 思路，但输出更实用的格式
 async function summarizeNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log("--apply:summarize")
 

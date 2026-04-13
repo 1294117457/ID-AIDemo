@@ -3,7 +3,6 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { callTool } from '../mcp/mcpClient.js'
 import { ingestFile, removeSource, listSources, getStats } from '../services/knowledgeManager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -67,8 +66,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   const ext = path.extname(fileName).toLowerCase()
   
   try {
-    // const result = await ingestFile(filePath, fileName)
-    const result = await ingestFile(filePath, fileName,ext)
+    const result = await ingestFile(filePath, fileName, ext)
     if (result.chunkCount === 0) {
       res.json({ code: 400, msg: '文件内容为空', data: { fileName, status: 'parse_empty' } })
       return
