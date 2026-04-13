@@ -16,14 +16,6 @@ async function getApp() {
   if (!_app) _app = await getCompiledGraph()
   return _app
 }
-// ─── 以下是新增的 export 接口，供 HTTP 路由调用 ───
-
-export interface AgentInput {
-  userInput: string
-  documentText?: string
-  templates?: ScoreTemplate[]
-  sessionId: string
-}
 
 /** 从 state 快照中提取通用返回结构 */
 function extractResult(state: any) {
@@ -44,7 +36,7 @@ function extractResult(state: any) {
 /** 检查 getState 快照中是否有 interrupt，有则返回 interrupt 响应 */
 async function checkInterrupt(config: { configurable: { thread_id: string } }) {
   const app = await getApp()
-  const snapshot = app.getState(config)
+  const snapshot = await app.getState(config)
   const interrupts = (snapshot.tasks ?? []).flatMap((t: any) => t.interrupts ?? [])
   if (interrupts.length > 0) {
     const question = interrupts.map((i: any) => i.value).join('\n')
@@ -102,7 +94,7 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
   const config = { configurable: { thread_id: input.sessionId } }
 
   const SKIP_NODES = new Set(['classify', 'analyzeAndMatch'])
-const app = await getApp()
+  const app = await getApp()
   const eventStream = app.streamEvents(
     {
       messages: [new HumanMessage(input.userInput)],
