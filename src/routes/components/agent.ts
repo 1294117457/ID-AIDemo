@@ -3,9 +3,9 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { parseFileToText } from '../services/knowledgeManager.js'
-import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../agent/mainGraph.js'
-import type { ScoreTemplate } from '../types/scoreTemplate.js'
+import { parseFileToText } from '../../services/knowledgeManager.js'
+import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../../agent/mainGraph.js'
+import type { ScoreTemplate } from '../../types/scoreTemplate.js'
 import type { Request, Response } from 'express'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

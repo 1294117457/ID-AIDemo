@@ -30,7 +30,6 @@ async function classifyNode(state: MainStateType): Promise<Partial<MainStateType
     })
   )
 
-  // ↓↓↓ 以下和你 demo 第 29-59 行完全一样，一字不改 ↓↓↓
   const allUserText = state.messages
     .filter(m => m instanceof HumanMessage)
     .map(m => m.content)

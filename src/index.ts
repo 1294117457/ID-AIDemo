@@ -3,11 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import { initDb } from './db/init.js'
 import { initKnowledge } from './services/knowledgeManager.js'
-import knowledgeRouter from './routes/knowledge.js'
-import analyzeRouter from './routes/analyze.js'
-import configRouter from './routes/config.js'
-import agentRouter from './routes/agent.js'
-
+import apiRouter from './routes/index.js'
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -17,11 +13,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
-app.use('/knowledge', knowledgeRouter)
-app.use('/analyze', analyzeRouter)
-app.use('/config', configRouter)
-app.use('/agent', agentRouter)
-
+app.use('/api', apiRouter) 
 const PORT = Number(process.env.PORT ?? 3001)
 
 async function main(): Promise<void> {
@@ -30,20 +22,6 @@ async function main(): Promise<void> {
   await initKnowledge()
   app.listen(PORT, () => {
     console.log(`[agent] 运行中 → http://localhost:${PORT}`)
-    console.log('[agent] 接口列表:')
-    console.log('  GET  /health')
-    console.log('  GET  /knowledge/list')
-    console.log('  GET  /knowledge/stats')
-    console.log('  POST /knowledge/upload')
-    console.log('  DEL  /knowledge/:sourceFile')
-    console.log('  POST /analyze/certificate')
-    console.log('  POST /analyze/generate')
-    console.log('  GET  /config')
-    console.log('  PUT  /config')
-    console.log('  POST /agent/chat')
-    console.log('  POST /agent/stream')
-    console.log('  POST /agent/resume')
-    console.log('  POST /agent/resume-stream')
   })
 }
 

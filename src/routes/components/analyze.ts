@@ -5,9 +5,9 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { parseFileToText, searchKnowledge } from '../services/knowledgeManager.js'
-import { getApiKey, getBaseUrl, getChatModel } from '../services/aiConfig.js'
-import type { ScoreTemplate } from '../types/scoreTemplate.js'
+import { parseFileToText, searchKnowledge } from '../../services/knowledgeManager.js'
+import { getApiKey, getBaseUrl, getChatModel } from '../../services/aiConfig.js'
+import type { ScoreTemplate } from '../../types/scoreTemplate.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')

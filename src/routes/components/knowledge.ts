@@ -3,7 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { ingestFile, removeSource, listSources, getStats } from '../services/knowledgeManager.js'
+import { ingestFile, removeSource, listSources, getStats } from '../../services/knowledgeManager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')

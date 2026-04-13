@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getConfigView, updateConfig, type ConfigUpdate } from '../services/aiConfig.js'
+import { getConfigView, updateConfig, type ConfigUpdate } from '../../services/aiConfig.js'
 
 const router = Router()
 
