@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 import {createChatModel} from '../services/llmService.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const CHECKPOINT_PATH = path.resolve(__dirname, '../../../data/checkpoints.db')
+const CHECKPOINT_PATH = path.resolve(__dirname, '../../data/checkpoints.db')
 
 let checkpointer: SqliteSaver
 
