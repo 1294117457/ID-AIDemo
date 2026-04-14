@@ -50,6 +50,12 @@ export function getEmbeddingModel(): string {
     ?? 'text-embedding-v3'
 }
 
+export function getContextMaxMessages(): number {
+  const val = loadAll()['context_max_messages']
+  const n = parseInt(val ?? '20', 10)
+  return isNaN(n) || n < 2 ? 20 : n
+}
+
 // ---- GET /config 返回视图（apiKey 掩码）----
 
 export function getConfigView() {
@@ -59,22 +65,24 @@ export function getConfigView() {
     ? raw.slice(0, 4) + '****' + raw.slice(-4)
     : raw.length > 0 ? '****' : ''
   return {
-    systemRole:     cfg['system_role']      ?? '',
-    apiKey:         maskedKey,
-    baseUrl:        cfg['base_url']         ?? '',
-    chatModel:      cfg['chat_model']       ?? '',
-    embeddingModel: cfg['embedding_model']  ?? '',
+    systemRole:          cfg['system_role']          ?? '',
+    apiKey:              maskedKey,
+    baseUrl:             cfg['base_url']             ?? '',
+    chatModel:           cfg['chat_model']           ?? '',
+    embeddingModel:      cfg['embedding_model']      ?? '',
+    contextMaxMessages:  parseInt(cfg['context_max_messages'] ?? '20', 10),
   }
 }
 
 // ---- PUT /config 写入（upsert + 清缓存）----
 
 export interface ConfigUpdate {
-  systemRole?:     string
-  apiKey?:         string
-  baseUrl?:        string
-  chatModel?:      string
-  embeddingModel?: string
+  systemRole?:          string
+  apiKey?:              string
+  baseUrl?:             string
+  chatModel?:           string
+  embeddingModel?:      string
+  contextMaxMessages?:  number
 }
 
 export function updateConfig(update: ConfigUpdate): void {
@@ -96,6 +104,8 @@ export function updateConfig(update: ConfigUpdate): void {
   if (update.baseUrl        != null) entries.push(['base_url',        update.baseUrl])
   if (update.chatModel      != null) entries.push(['chat_model',      update.chatModel])
   if (update.embeddingModel != null) entries.push(['embedding_model', update.embeddingModel])
+  if (update.contextMaxMessages != null)
+    entries.push(['context_max_messages', String(update.contextMaxMessages)])
 
   if (entries.length > 0) {
     upsertMany(entries)

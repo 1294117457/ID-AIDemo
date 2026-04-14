@@ -84,7 +84,7 @@ function confirmRoute(state: ApplyStateType): 'confirm' | 'end' {
   return suggestions.length > 0 ? 'confirm' : 'end'
 }
 
-// ─── confirmNode：展示匹配结果，interrupt 等待用户上传文件确认 ───
+// ─── confirmNode：展示匹配结果，interrupt 等待用户通过按钮确认 ───
 
 async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:confirm (interrupt)')
@@ -93,21 +93,17 @@ async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateTyp
     .map(r => { try { return JSON.parse(r) } catch { return null } })
     .filter((s: any) => s && !s.error)
 
-  const summary = suggestions.map((s: any, i: number) =>
-    `${i + 1}. **${s.templateName}** / ${s.ruleName}（预计 ${s.estimatedScore} 分）\n   理由：${s.reason}`
-  ).join('\n')
-
+  // 只展示匹配摘要，不出现 JSON 指令（前端通过按钮采集数据）
   const question = [
-    `已为您匹配到以下加分项：\n\n${summary}`,
+    `已为您匹配到以下加分项，请上传对应证明材料后点击「确认提交」：`,
     '',
-    '请通过页面上传对应的证明材料，获取文件 ID 后，回复以下 JSON 确认提交：',
-    '```json',
-    '{"confirm":true,"proofFileIds":[文件ID1,文件ID2],"proofValues":[分值1,分值2]}',
-    '```',
-    '或回复 **cancel** 取消申请。',
+    ...suggestions.map((s: any, i: number) =>
+      `${i + 1}. **${s.templateName}** / ${s.ruleName}（预计 ${s.estimatedScore} 分）\n   ${s.reason}`
+    ),
   ].join('\n')
 
-  const userAnswer = interrupt(question)
+  // 通过 interrupt value 携带 suggestions，避免依赖主图无法读取的子图状态
+  const userAnswer = interrupt({ type: 'confirm' as const, question, suggestions })
 
   return {
     messages: [
@@ -117,7 +113,7 @@ async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateTyp
   }
 }
 
-// ─── submitNode：解析用户回复，回调 Java 提交申请 ───
+// ─── submitNode：解析前端按钮传来的结构化 resume，回调 Java 提交申请 ───
 
 async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:submit')
@@ -127,29 +123,24 @@ async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType
     .at(-1)
   const answer = String(lastHuman?.content ?? '').trim()
 
-  if (answer.toLowerCase() === 'cancel') {
+  // 解析结构化 resume：{action, proofFileIds, proofValues} 或 "cancel"
+  let parsed: any
+  try {
+    parsed = JSON.parse(answer)
+  } catch {
+    parsed = { action: answer.toLowerCase() === 'cancel' ? 'cancel' : 'unknown' }
+  }
+
+  if (parsed.action === 'cancel') {
     return { messages: [new AIMessage('已取消申请，您可以随时重新发起。')] }
   }
 
-  // 解析用户回复中的 JSON
-  let proofFileIds: number[] = []
-  let proofValues: number[] = []
-  try {
-    const match = answer.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('未找到 JSON')
-    const parsed = JSON.parse(match[0])
-    if (!parsed.confirm) throw new Error('未确认')
-    proofFileIds = Array.isArray(parsed.proofFileIds) ? parsed.proofFileIds : []
-    proofValues  = Array.isArray(parsed.proofValues)  ? parsed.proofValues  : []
-  } catch {
-    return { messages: [new AIMessage(
-      '格式不正确，请重新发送确认 JSON，或回复 cancel 取消。\n\n示例：\n```json\n{"confirm":true,"proofFileIds":[1,2],"proofValues":[2.0,1.0]}\n```'
-    )] }
+  if (parsed.action !== 'confirm' || !Array.isArray(parsed.proofFileIds) || parsed.proofFileIds.length === 0) {
+    return { messages: [new AIMessage('操作异常，请重试或联系管理员。')] }
   }
 
-  if (proofFileIds.length === 0) {
-    return { messages: [new AIMessage('请至少上传一个证明材料（proofFileIds 不能为空）。')] }
-  }
+  const proofFileIds: number[] = parsed.proofFileIds
+  const proofValues: number[]  = Array.isArray(parsed.proofValues) ? parsed.proofValues : []
 
   if (!state.userInfo) {
     return { messages: [new AIMessage('获取用户信息失败，请重新登录后再申请。')] }

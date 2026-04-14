@@ -14,9 +14,9 @@ router.get('/', (_req, res) => {
 
 /** PUT /config — 更新 AI 配置，修改后立即生效 */
 router.put('/', (req, res) => {
-  const { systemRole, apiKey, baseUrl, chatModel, embeddingModel } = req.body as ConfigUpdate
+  const { systemRole, apiKey, baseUrl, chatModel, embeddingModel, contextMaxMessages } = req.body as ConfigUpdate
   try {
-    updateConfig({ systemRole, apiKey, baseUrl, chatModel, embeddingModel })
+    updateConfig({ systemRole, apiKey, baseUrl, chatModel, embeddingModel, contextMaxMessages })
     res.json({ code: 200, msg: '配置已更新，立即生效', data: null })
   } catch (err) {
     res.json({ code: 500, msg: `更新失败: ${String(err)}`, data: null })

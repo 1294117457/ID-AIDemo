@@ -1,4 +1,4 @@
-import { classifyPrompt } from './prompts.js'
+import { classifyPrompt, contextualAskPrompt } from './prompts.js'
 import { MainState, MainStateType } from './state.js'
 import { applySubgraph } from './subGraphs/applyGraph.js'
 import { consultSubgraph } from './subGraphs/consultGraph.js'
@@ -50,9 +50,17 @@ async function classifyNode(state: MainStateType): Promise<Partial<MainStateType
 }
 
 // ─── askForMoreNode ───
-// 搬自你 demo 的 mainGraph.ts 第 64-75 行，一字不改
+// 使用 LLM 生成感知历史的追问，告知已记录信息，只询问缺失部分
 async function askForMoreNode(state: MainStateType): Promise<Partial<MainStateType>> {
-  const question = `申请材料不完整，还缺：${state.missingInfo.join('、')}。请补充：`
+  const allUserText = state.messages
+    .filter(m => m instanceof HumanMessage)
+    .map(m => String(m.content))
+    .join('\n')
+
+  const model = createChatModel(0)
+  const reply = await model.invoke([new HumanMessage(contextualAskPrompt(allUserText, state.missingInfo))])
+  const question = String(reply.content)
+
   console.log(`-main:askForMoreNode: ${question}`)
 
   const userAnswer = interrupt(question)

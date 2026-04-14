@@ -1,6 +1,7 @@
 import { HumanMessage } from '@langchain/core/messages'
 import { Command } from '@langchain/langgraph'
 import { getCompiledGraph } from '../agent/mainGraph.js'
+import { getContextMaxMessages } from './aiConfig.js'
 import type { ScoreTemplate, UserInfo } from '../agent/state.js'
 
 export interface AgentInput {
@@ -40,22 +41,48 @@ async function checkInterrupt(config: { configurable: { thread_id: string } }) {
   const snapshot = await app.getState(config)
   const interrupts = (snapshot.tasks ?? []).flatMap((t: any) => t.interrupts ?? [])
   if (interrupts.length > 0) {
-    const question = interrupts.map((i: any) => i.value).join('\n')
+    const raw = interrupts[0].value
+
+    // confirmNode 传的是结构化对象 { type: 'confirm', question, suggestions }
+    if (raw && typeof raw === 'object' && (raw as any).type === 'confirm') {
+      const data = raw as { type: 'confirm'; question: string; suggestions: any[] }
+      return {
+        interrupted: true as const,
+        question: data.question,
+        suggestions: data.suggestions ?? [],
+        reply: '',
+        intent: 'apply',
+        documentText: '',
+      }
+    }
+
+    // askForMoreNode 传的是普通字符串
+    const question = typeof raw === 'string' ? raw : String(raw)
     return {
       interrupted: true as const,
       question,
+      suggestions: [],
       reply: '',
       intent: (snapshot.values as any)?.intent ?? 'insufficient',
       documentText: (snapshot.values as any)?.documentText ?? '',
-      suggestions: [],
     }
   }
   return null
 }
 
 /**
- * 普通调用（非流式）
+ * 检查对话上下文是否超出限制
+ * 返回当前消息数与上限，超出则 exceeded = true
  */
+async function checkContextLimit(config: { configurable: { thread_id: string } }) {
+  const app = await getApp()
+  const snapshot = await app.getState(config)
+  const msgCount = (snapshot.values as any)?.messages?.length ?? 0
+  const limit = getContextMaxMessages()
+  return { exceeded: msgCount >= limit, msgCount, limit }
+}
+
+
 export async function invokeAgent(input: AgentInput) {
   const config = { configurable: { thread_id: input.sessionId } }
   const app = await getApp()
@@ -95,7 +122,17 @@ export async function resumeAgent(sessionId: string, supplement: string) {
 export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: string; data: any }> {
   const config = { configurable: { thread_id: input.sessionId } }
 
-  const SKIP_NODES = new Set(['classify', 'analyzeAndMatch'])
+  // 上下文长度限制检查
+  const ctxCheck = await checkContextLimit(config)
+  if (ctxCheck.exceeded) {
+    yield {
+      type: 'context_limit',
+      data: { message: `对话上下文已达上限（${ctxCheck.limit} 条），请开启新对话继续。` }
+    }
+    return
+  }
+
+  const SKIP_NODES = new Set(['classify', 'analyzeAndMatch', 'ask', 'summarize'])
   const app = await getApp()
   const eventStream = app.streamEvents(
     {
@@ -119,17 +156,12 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
-    const snapshot = await app.getState(config)
-    const state = snapshot.values as any
-    const suggestions = (state.checkResults ?? [])
-      .map((r: string) => { try { return JSON.parse(r) } catch { return null } })
-      .filter(Boolean)
     yield {
       type: 'interrupt',
       data: {
         question: interruptResult.question,
-        suggestions,
-        requireFiles: suggestions.length > 0,
+        suggestions: interruptResult.suggestions,
+        requireFiles: interruptResult.suggestions.length > 0,
       }
     }
     return
@@ -146,7 +178,7 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
 export async function* streamResume(sessionId: string, supplement: string): AsyncGenerator<{ type: string; data: any }> {
   const config = { configurable: { thread_id: sessionId } }
 
-  const SKIP_NODES = new Set(['classify', 'analyzeAndMatch'])
+  const SKIP_NODES = new Set(['classify', 'analyzeAndMatch', 'ask', 'summarize'])
   const app = await getApp()
   const eventStream = app.streamEvents(
     new Command({ resume: supplement }),
@@ -165,17 +197,12 @@ export async function* streamResume(sessionId: string, supplement: string): Asyn
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
-    const snapshot2 = await app.getState(config)
-    const state2 = snapshot2.values as any
-    const suggestions2 = (state2.checkResults ?? [])
-      .map((r: string) => { try { return JSON.parse(r) } catch { return null } })
-      .filter(Boolean)
     yield {
       type: 'interrupt',
       data: {
         question: interruptResult.question,
-        suggestions: suggestions2,
-        requireFiles: suggestions2.length > 0,
+        suggestions: interruptResult.suggestions,
+        requireFiles: interruptResult.suggestions.length > 0,
       }
     }
     return
