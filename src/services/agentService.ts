@@ -1,13 +1,14 @@
 import { HumanMessage } from '@langchain/core/messages'
 import { Command } from '@langchain/langgraph'
 import { getCompiledGraph } from '../agent/mainGraph.js'
-import type { ScoreTemplate } from '../types/scoreTemplate.js'
+import type { ScoreTemplate, UserInfo } from '../agent/state.js'
 
 export interface AgentInput {
   userInput: string
   documentText?: string
   templates?: ScoreTemplate[]
   sessionId: string
+  userInfo?: UserInfo | null
 }
 
 let _app: any = null
@@ -62,6 +63,7 @@ export async function invokeAgent(input: AgentInput) {
     messages: [new HumanMessage(input.userInput)],
     documentText: input.documentText ?? '',
     templates: input.templates ?? [],
+    userInfo: input.userInfo ?? null,
   }, config)
 
   const interruptResult = await checkInterrupt(config)
@@ -100,6 +102,7 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
       messages: [new HumanMessage(input.userInput)],
       documentText: input.documentText ?? '',
       templates: input.templates ?? [],
+      userInfo: input.userInfo ?? null,
     },
     { ...config, version: 'v2' }
   )
@@ -116,7 +119,19 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
-    yield { type: 'interrupt', data: { question: interruptResult.question } }
+    const snapshot = await app.getState(config)
+    const state = snapshot.values as any
+    const suggestions = (state.checkResults ?? [])
+      .map((r: string) => { try { return JSON.parse(r) } catch { return null } })
+      .filter(Boolean)
+    yield {
+      type: 'interrupt',
+      data: {
+        question: interruptResult.question,
+        suggestions,
+        requireFiles: suggestions.length > 0,
+      }
+    }
     return
   }
 
@@ -150,7 +165,19 @@ export async function* streamResume(sessionId: string, supplement: string): Asyn
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
-    yield { type: 'interrupt', data: { question: interruptResult.question } }
+    const snapshot2 = await app.getState(config)
+    const state2 = snapshot2.values as any
+    const suggestions2 = (state2.checkResults ?? [])
+      .map((r: string) => { try { return JSON.parse(r) } catch { return null } })
+      .filter(Boolean)
+    yield {
+      type: 'interrupt',
+      data: {
+        question: interruptResult.question,
+        suggestions: suggestions2,
+        requireFiles: suggestions2.length > 0,
+      }
+    }
     return
   }
 

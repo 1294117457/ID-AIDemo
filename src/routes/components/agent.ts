@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { parseFileToText } from '../../services/knowledgeManager.js'
 import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../../services/agentService.js'
-import type { ScoreTemplate } from '../../types/scoreTemplate.js'
+import type { ScoreTemplate, UserInfo } from '../../agent/state.js'
 import type { Request, Response } from 'express'
 import {upload} from '../../common/upload.js'
 
@@ -34,7 +34,14 @@ async function parseAgentParams(req: Request) {
       templates = Array.isArray(parsed) ? (parsed as ScoreTemplate[]) : []
     } catch { /* ignore */ }
   }
-  return { message: message.trim(), sessionId, documentText, templates }
+
+  let userInfo: UserInfo | null = null
+  const userInfoRaw = (req.body as { userInfo?: string }).userInfo
+  if (userInfoRaw) {
+    try { userInfo = JSON.parse(userInfoRaw) } catch { /* ignore */ }
+  }
+
+  return { message: message.trim(), sessionId, documentText, templates, userInfo }
 }
 
 /**
@@ -44,7 +51,7 @@ async function parseAgentParams(req: Request) {
  *   message, sessionId, file?(optional), templates?(optional JSON string)
  */
 router.post('/chat', upload.single('file'), async (req: Request, res: Response) => {
-  const { message, sessionId, documentText, templates } = await parseAgentParams(req)
+  const { message, sessionId, documentText, templates, userInfo } = await parseAgentParams(req)
 
   if (!message && !documentText) {
     res.json({ code: 400, msg: '请输入文字或上传文件', data: null })
@@ -52,7 +59,7 @@ router.post('/chat', upload.single('file'), async (req: Request, res: Response) 
   }
 
   try {
-    const result = await invokeAgent({ userInput: message, documentText, templates, sessionId })
+    const result = await invokeAgent({ userInput: message, documentText, templates, sessionId, userInfo })
     res.json({ code: 200, msg: '成功', data: result })
   } catch (err) {
     console.error('[agent/chat] error:', err)
@@ -70,7 +77,7 @@ router.post('/chat', upload.single('file'), async (req: Request, res: Response) 
  *   data: [DONE]
  */
 router.post('/stream', upload.single('file'), async (req: Request, res: Response) => {
-  const { message, sessionId, documentText, templates } = await parseAgentParams(req)
+  const { message, sessionId, documentText, templates, userInfo } = await parseAgentParams(req)
 
   if (!message && !documentText) {
     res.json({ code: 400, msg: '请输入文字或上传文件', data: null })
@@ -84,7 +91,7 @@ router.post('/stream', upload.single('file'), async (req: Request, res: Response
   })
 
   try {
-    for await (const event of streamAgent({ userInput: message, documentText, templates, sessionId })) {
+    for await (const event of streamAgent({ userInput: message, documentText, templates, sessionId, userInfo })) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
   } catch (err) {

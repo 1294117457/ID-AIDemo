@@ -1,5 +1,34 @@
 import { MessagesAnnotation, Annotation } from '@langchain/langgraph'
-import type { ScoreTemplate } from '../types/scoreTemplate.js'   // ← 新增这行
+
+// ── 原 scoreTemplate.ts 内容内联（同时删除 src/types/scoreTemplate.ts 即可）──
+
+export interface TemplateRule {
+  id: number
+  ruleName: string
+  ruleScore: number
+  description?: string
+}
+
+export interface ScoreTemplate {
+  id: number
+  templateName: string
+  templateType: string   // CONDITION | TRANSFORM
+  scoreType: number      // 0/1/2
+  templateMaxScore?: number
+  reviewCount?: number   // 提交时需要
+  description?: string
+  rules: TemplateRule[]
+}
+
+// ── 用户信息（由 Java 从 users 表查询后随请求传来）──
+
+export interface UserInfo {
+  userId: number
+  studentId: string       // 从 username 提取的学号
+  studentName: string     // users.full_name
+  major: string           // users.major
+  enrollmentYear: number  // users.grade
+}
 
 export const MainState = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -16,9 +45,10 @@ export const MainState = Annotation.Root({
   retrievedContext: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
   answerDraft: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
 
-  // ↓↓↓ 以下 2 个字段是新增的 ↓↓↓
   templates: Annotation<ScoreTemplate[]>({ reducer: (_, x) => x, default: () => [] }),
   policyContext: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
+
+  userInfo: Annotation<UserInfo | null>({ reducer: (_, x) => x, default: () => null }),
 })
 
 export type MainStateType = typeof MainState.State
