@@ -2,7 +2,7 @@
 
 /** classify 节点的意图分类 prompt */
 export function classifyPrompt(allUserText: string): string {
-  return `分析以下用户的多轮输入，判断意图并提取信息：
+  return `分析以下用户的多轮输入，判断意图并提取信息。请以 JSON 格式返回结果。：
 
 【分类与校验规则】：
 1. 如果用户是单纯询问政策或了解相关信息（如"挑战杯能加多少分"），意图记为 consult。
@@ -22,7 +22,7 @@ export function consultSystemPrompt(systemRole: string, context: string): string
 }
 
 /** apply 子图的材料分析 prompt */
-export const ANALYZE_SYSTEM = '你是厦门大学信息学院推免加分审核专家。分析证明材料，判断可以申请哪些加分项。如果无匹配返回空数组。'
+export const ANALYZE_SYSTEM = '你是厦门大学信息学院推免加分审核专家。分析证明材料，判断可以申请哪些加分项，以 JSON 格式返回结果，如果无匹配返回空数组。'
 
 export function analyzeUserPrompt(
   documentText: string,
@@ -34,13 +34,26 @@ export function analyzeUserPrompt(
 ${documentText.slice(0, 2000)}
 ---
 
-可申请的加分模板列表：
+可申请的加分模板列表（JSON）：
 ${templatesJson}
 
 相关加分政策参考：
 ${policyContext}
 
-请分析证明材料，判断学生可以申请哪些加分项。`
+请分析证明材料，判断学生可以申请哪些加分项，严格按照以下 JSON 格式返回结果：
+{
+  "suggestions": [
+    {
+      "templateId": <模板id，number>,
+      "templateName": <模板名称，string>,
+      "ruleId": <匹配的规则id，number>,
+      "ruleName": <匹配的规则名称，string>,
+      "estimatedScore": <预计加分，number>,
+      "reason": <一句话匹配理由，不超过50字，string>
+    }
+  ]
+}
+若无匹配项，suggestions 返回空数组 []。`
 }
 
 /** apply 子图的结果汇总（无匹配时） */

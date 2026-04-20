@@ -37,10 +37,7 @@ export const MainState = Annotation.Root({
   missingInfo: Annotation<string[]>({ reducer: (_, x) => x, default: () => [] }),
   documentText: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
 
-  checkResults: Annotation<string[]>({
-    reducer: (old, newVal) => [...(old ?? []), ...(newVal ?? [])],
-    default: () => []
-  }),
+  checkResults: Annotation<string[]>({ reducer: (_, x) => x, default: () => [] }),
 
   retrievedContext: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
   answerDraft: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),

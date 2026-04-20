@@ -9,6 +9,7 @@ export function createChatModel(temperature = 0.3) {
     configuration: { baseURL: getBaseUrl() },
     modelName: getChatModel(),
     temperature,
+    modelKwargs: { enable_thinking: false },
   })
 }
 

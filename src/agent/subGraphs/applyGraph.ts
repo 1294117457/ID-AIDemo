@@ -1,6 +1,6 @@
 import { ApplyState, ApplyStateType } from '../state.js'
 import { StateGraph, START, END, interrupt } from '@langchain/langgraph'
-import { HumanMessage, AIMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { searchKnowledge } from '../../services/knowledgeManager.js'
 import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../prompts.js'
@@ -46,6 +46,7 @@ async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<Apply
 
   const model = createChatModel(0.1).withStructuredOutput(SuggestionSchema)
   const result = await model.invoke([
+    new SystemMessage(ANALYZE_SYSTEM),
     new HumanMessage(analyzeUserPrompt(
       state.documentText.slice(0, 2000),
       JSON.stringify(templatesForPrompt, null, 2),

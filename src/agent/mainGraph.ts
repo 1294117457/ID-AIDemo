@@ -90,9 +90,14 @@ const mainGraph = new StateGraph(MainState)
   .addEdge('applyGraph', END)
   .addEdge('consultGraph', END)
 
+let _compiledGraph: Awaited<ReturnType<typeof mainGraph.compile>> | null = null
+
 export async function getCompiledGraph() {
   if (!checkpointer) {
     checkpointer = SqliteSaver.fromConnString(CHECKPOINT_PATH)
   }
-  return mainGraph.compile({ checkpointer })
+  if (!_compiledGraph) {
+    _compiledGraph = mainGraph.compile({ checkpointer })
+  }
+  return _compiledGraph
 }
