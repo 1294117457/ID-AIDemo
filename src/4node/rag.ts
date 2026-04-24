@@ -1,5 +1,5 @@
 // ─── RAG — 向量知识库（Agent 的外部大脑） ─────────────────────────────────────
-// 独立闭环模块：文件解析 → 向量化 → 存储 → 检索，供 nodes/ 调用
+// 独立闭环模块：文件解析 → 向量化 → 存储 → 检索，供 nodes 和 api 层调用
 
 import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
@@ -8,13 +8,13 @@ import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf'
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx'
 import { CSVLoader } from '@langchain/community/document_loaders/fs/csv'
 import type { Document } from '@langchain/core/documents'
-import { createEmbeddings } from './model.js'
+import { createEmbeddings } from '../2model/model.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname    = path.dirname(fileURLToPath(import.meta.url))
-const KNOWLEDGE_DIR = path.resolve(__dirname, '../docs/0加分文件')
+const KNOWLEDGE_DIR = path.resolve(__dirname, '../../docs/0加分文件')
 
 const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 500, chunkOverlap: 100 })
 

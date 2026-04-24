@@ -1,6 +1,6 @@
 // ─── Layer 7 API: AI 配置管理路由 ─────────────────────────────────────────────
 import { Router } from 'express'
-import { getConfigView, updateConfig, type ConfigUpdate } from '../config.js'
+import { getConfigView, updateConfig, type ConfigUpdate } from '../1config/config.js'
 
 const router = Router()
 

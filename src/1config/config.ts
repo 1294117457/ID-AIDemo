@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const DB_PATH    = path.resolve(__dirname, '../data/agent.db')
-export const CHECKPOINT_PATH = path.resolve(__dirname, '../data/checkpoints.db')
+const DB_PATH    = path.resolve(__dirname, '../../data/agent.db')
+export const CHECKPOINT_PATH = path.resolve(__dirname, '../../data/checkpoints.db')
 
 // ── SQLite ─────────────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ export function getContextMaxMessages(): number {
   return isNaN(n) || n < 2 ? 20 : n
 }
 
-// ── 配置视图 & 更新 (供 api/config.ts 调用) ─────────────────────────────────────
+// ── 配置视图 & 更新 (供 api 层调用) ──────────────────────────────────────────────
 
 export function getConfigView() {
   const cfg = loadAll()

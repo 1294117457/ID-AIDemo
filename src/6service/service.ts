@@ -3,9 +3,9 @@
 
 import { HumanMessage } from '@langchain/core/messages'
 import { Command } from '@langchain/langgraph'
-import { getCompiledGraph } from './graph.js'
-import { getContextMaxMessages } from './config.js'
-import type { ScoreTemplate, UserInfo } from './state.js'
+import { getCompiledGraph } from '../5graph/graph.js'
+import { getContextMaxMessages } from '../1config/config.js'
+import type { ScoreTemplate, UserInfo } from '../3state/state.js'
 
 export interface AgentInput {
   userInput:    string

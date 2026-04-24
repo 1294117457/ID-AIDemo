@@ -2,7 +2,7 @@
 // 所有模型实例通过工厂函数创建，业务代码不直接 new ChatOpenAI()
 
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'
-import { getApiKey, getBaseUrl, getChatModel, getEmbeddingModel } from './config.js'
+import { getApiKey, getBaseUrl, getChatModel, getEmbeddingModel } from '../1config/config.js'
 
 /** 通用对话模型（temperature 按节点用途传入） */
 export function createChatModel(temperature = 0.3) {

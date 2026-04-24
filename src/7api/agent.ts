@@ -4,9 +4,9 @@ import type { Request, Response } from 'express'
 import path from 'path'
 import fs from 'fs'
 import { upload } from './upload.js'
-import { parseFileToText } from '../rag.js'
-import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../service.js'
-import type { ScoreTemplate, UserInfo } from '../state.js'
+import { parseFileToText } from '../4node/rag.js'
+import { invokeAgent, resumeAgent, streamAgent, streamResume } from '../6service/service.js'
+import type { ScoreTemplate, UserInfo } from '../3state/state.js'
 
 const router = Router()
 

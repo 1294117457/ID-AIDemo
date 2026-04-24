@@ -1,5 +1,6 @@
 // ─── Prompts — 所有提示词模板 ─────────────────────────────────────────────────
 // 集中管理，修改提示词只需改这一个文件
+// prompts 只被 Node 层引用，所以放在 4node/ 目录下
 
 /** classifyNode 的意图分类 prompt */
 export function classifyPrompt(allUserText: string): string {

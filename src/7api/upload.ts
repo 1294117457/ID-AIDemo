@@ -1,4 +1,4 @@
-// ─── API 层工具：文件上传中间件 ────────────────────────────────────────────────
+// ─── Layer 7 API 工具：文件上传中间件 ────────────────────────────────────────────
 import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'

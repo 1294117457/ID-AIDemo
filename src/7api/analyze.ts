@@ -4,9 +4,9 @@ import path from 'path'
 import fs from 'fs'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { upload } from './upload.js'
-import { parseFileToText, searchKnowledge } from '../rag.js'
-import { createChatModel } from '../model.js'
-import type { ScoreTemplate } from '../state.js'
+import { parseFileToText, searchKnowledge } from '../4node/rag.js'
+import { createChatModel } from '../2model/model.js'
+import type { ScoreTemplate } from '../3state/state.js'
 
 const router = Router()
 

@@ -3,12 +3,12 @@
 
 import { StateGraph, START, END } from '@langchain/langgraph'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
-import { MainState, ApplyState, ConsultState } from './state.js'
-import { CHECKPOINT_PATH } from './config.js'
+import { MainState, ApplyState, ConsultState } from '../3state/state.js'
+import { CHECKPOINT_PATH } from '../1config/config.js'
 
-import { classifyNode, askForMoreNode } from './nodes/classifyNodes.js'
-import { fetchPolicyNode, analyzeAndMatchNode, summarizeNode, confirmNode, submitNode, confirmRoute } from './nodes/applyNodes.js'
-import { retrieveNode, answerNode } from './nodes/consultNodes.js'
+import { classifyNode, askForMoreNode } from '../4node/classifyNodes.js'
+import { fetchPolicyNode, analyzeAndMatchNode, summarizeNode, confirmNode, submitNode, confirmRoute } from '../4node/applyNodes.js'
+import { retrieveNode, answerNode } from '../4node/consultNodes.js'
 
 // ── 咨询子图 ──────────────────────────────────────────────────────────────────
 

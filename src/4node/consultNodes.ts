@@ -2,11 +2,11 @@
 // 咨询子图的节点：检索知识库 → 生成回答
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { createChatModel } from '../model.js'
-import { searchKnowledge } from '../rag.js'
-import { consultSystemPrompt } from '../prompts.js'
-import { getSystemRole } from '../config.js'
-import type { ConsultStateType } from '../state.js'
+import { createChatModel } from '../2model/model.js'
+import { searchKnowledge } from './rag.js'
+import { consultSystemPrompt } from './prompts.js'
+import { getSystemRole } from '../1config/config.js'
+import type { ConsultStateType } from '../3state/state.js'
 
 export async function retrieveNode(state: ConsultStateType): Promise<Partial<ConsultStateType>> {
   console.log('--consult:retrieve')

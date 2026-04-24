@@ -4,7 +4,7 @@
 
 import { MessagesAnnotation, Annotation } from '@langchain/langgraph'
 
-// ── 类型定义（内联，避免额外文件） ───────────────────────────────────────────
+// ── 类型定义 ────────────────────────────────────────────────────────────────────
 
 export interface TemplateRule {
   id:           number
