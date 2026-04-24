@@ -1,36 +1,39 @@
-import { ApplyState, ApplyStateType } from '../state.js'
-import { StateGraph, START, END, interrupt } from '@langchain/langgraph'
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
-import { z } from 'zod'
-import { searchKnowledge } from '../../services/knowledgeManager.js'
-import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../prompts.js'
-import { createChatModel } from '../../services/llmService.js'
+// ─── Layer 4 Node: Apply Flow ──────────────────────────────────────────────────
+// 申请加分子图的所有节点：取回政策 → 分析匹配 → 汇总 → 确认(interrupt) → 提交
 
-const JAVA_URL = process.env.JAVA_BACKEND_URL ?? 'http://localhost:8080'
+import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
+import { interrupt } from '@langchain/langgraph'
+import { z } from 'zod'
+import { createChatModel } from '../model.js'
+import { searchKnowledge } from '../rag.js'
+import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../prompts.js'
+import type { ApplyStateType } from '../state.js'
+
+const JAVA_URL    = process.env.JAVA_BACKEND_URL    ?? 'http://localhost:8080'
 const SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY ?? 'id-ai-internal-secret-2024'
 
-// ─── fetchPolicyNode ───
+// ── fetchPolicyNode ───────────────────────────────────────────────────────────
 
-async function fetchPolicyNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
+export async function fetchPolicyNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:fetchPolicy')
   const policyContext = await searchKnowledge(state.documentText.slice(0, 512), 5)
   return { policyContext }
 }
 
-// ─── analyzeAndMatchNode ───
+// ── analyzeAndMatchNode ───────────────────────────────────────────────────────
 
 const SuggestionSchema = z.object({
   suggestions: z.array(z.object({
-    templateId: z.number(),
-    templateName: z.string(),
-    ruleId: z.number(),
-    ruleName: z.string(),
+    templateId:     z.number(),
+    templateName:   z.string(),
+    ruleId:         z.number(),
+    ruleName:       z.string(),
     estimatedScore: z.number(),
-    reason: z.string().describe('一句话匹配理由，不超过50字'),
+    reason:         z.string().describe('一句话匹配理由，不超过50字'),
   }))
 })
 
-async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
+export async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:analyzeAndMatch')
 
   if (!state.templates || state.templates.length === 0) {
@@ -38,9 +41,7 @@ async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<Apply
   }
 
   const templatesForPrompt = state.templates.map(t => ({
-    id: t.id,
-    templateName: t.templateName,
-    templateType: t.templateType,
+    id: t.id, templateName: t.templateName, templateType: t.templateType,
     rules: t.rules.map(r => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
   }))
 
@@ -53,12 +54,13 @@ async function analyzeAndMatchNode(state: ApplyStateType): Promise<Partial<Apply
       state.policyContext
     )),
   ])
+
   return { checkResults: result.suggestions.map(s => JSON.stringify(s)) }
 }
 
-// ─── summarizeNode ───
+// ── summarizeNode ─────────────────────────────────────────────────────────────
 
-async function summarizeNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
+export async function summarizeNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:summarize')
 
   const suggestions = state.checkResults
@@ -76,25 +78,24 @@ async function summarizeNode(state: ApplyStateType): Promise<Partial<ApplyStateT
   return { messages: [new AIMessage(`为您匹配到以下加分项：\n\n${summary}`)] }
 }
 
-// ─── confirmRoute：summarize 后判断是否有匹配 ───
+// ── confirmRoute ──────────────────────────────────────────────────────────────
 
-function confirmRoute(state: ApplyStateType): 'confirm' | 'end' {
+export function confirmRoute(state: ApplyStateType): 'confirm' | 'end' {
   const suggestions = state.checkResults
     .map(r => { try { return JSON.parse(r) } catch { return null } })
     .filter((s: any) => s && !s.error)
   return suggestions.length > 0 ? 'confirm' : 'end'
 }
 
-// ─── confirmNode：展示匹配结果，interrupt 等待用户通过按钮确认 ───
+// ── confirmNode（interrupt 等待前端按钮确认） ─────────────────────────────────
 
-async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
+export async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:confirm (interrupt)')
 
   const suggestions = state.checkResults
     .map(r => { try { return JSON.parse(r) } catch { return null } })
     .filter((s: any) => s && !s.error)
 
-  // 只展示匹配摘要，不出现 JSON 指令（前端通过按钮采集数据）
   const question = [
     `已为您匹配到以下加分项，请上传对应证明材料后点击「确认提交」：`,
     '',
@@ -103,7 +104,6 @@ async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateTyp
     ),
   ].join('\n')
 
-  // 通过 interrupt value 携带 suggestions，避免依赖主图无法读取的子图状态
   const userAnswer = interrupt({ type: 'confirm' as const, question, suggestions })
 
   return {
@@ -114,28 +114,21 @@ async function confirmNode(state: ApplyStateType): Promise<Partial<ApplyStateTyp
   }
 }
 
-// ─── submitNode：解析前端按钮传来的结构化 resume，回调 Java 提交申请 ───
+// ── submitNode ────────────────────────────────────────────────────────────────
 
-async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
+export async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType>> {
   console.log('--apply:submit')
 
-  const lastHuman = state.messages
-    .filter(m => m instanceof HumanMessage)
-    .at(-1)
+  const lastHuman = state.messages.filter(m => m instanceof HumanMessage).at(-1)
   const answer = String(lastHuman?.content ?? '').trim()
 
-  // 解析结构化 resume：{action, proofFileIds, proofValues} 或 "cancel"
   let parsed: any
-  try {
-    parsed = JSON.parse(answer)
-  } catch {
-    parsed = { action: answer.toLowerCase() === 'cancel' ? 'cancel' : 'unknown' }
-  }
+  try { parsed = JSON.parse(answer) }
+  catch { parsed = { action: answer.toLowerCase() === 'cancel' ? 'cancel' : 'unknown' } }
 
   if (parsed.action === 'cancel') {
     return { messages: [new AIMessage('已取消申请，您可以随时重新发起。')] }
   }
-
   if (parsed.action !== 'confirm' || !Array.isArray(parsed.proofFileIds) || parsed.proofFileIds.length === 0) {
     return { messages: [new AIMessage('操作异常，请重试或联系管理员。')] }
   }
@@ -155,9 +148,7 @@ async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType
     return { messages: [new AIMessage('申请数据异常，请重新上传证明材料。')] }
   }
 
-  // 从 state.templates 查完整模板（需要 scoreType, reviewCount）
   const fullTemplate = state.templates.find(t => t.id === suggestion.templateId)
-
   const submitBody = {
     userId:         state.userInfo.userId,
     studentId:      state.userInfo.studentId,
@@ -172,26 +163,19 @@ async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType
     reviewCount:    fullTemplate?.reviewCount ?? 1,
     remark:         `AI 智能匹配 - ${suggestion.reason ?? ''}`,
     proofItems: proofFileIds.map((id: number, i: number) => ({
-      proofFileId: id,
-      proofValue:  proofValues[i] ?? 0,
-      remark:      '',
+      proofFileId: id, proofValue: proofValues[i] ?? 0, remark: '',
     })),
   }
 
   try {
     const resp = await fetch(`${JAVA_URL}/internal/agent/submit`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Service-Key': SERVICE_KEY,
-      },
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Service-Key': SERVICE_KEY },
       body: JSON.stringify(submitBody),
     })
     const data = await resp.json() as any
     if (data.code === 200) {
-      return { messages: [new AIMessage(
-        `✅ 申请已提交成功！申请编号：**${data.data}**，请等待审核员审核。`
-      )] }
+      return { messages: [new AIMessage(`✅ 申请已提交成功！申请编号：**${data.data}**，请等待审核员审核。`)] }
     }
     return { messages: [new AIMessage(`提交失败：${data.msg}，请稍后重试或手动提交。`)] }
   } catch (e) {
@@ -199,23 +183,3 @@ async function submitNode(state: ApplyStateType): Promise<Partial<ApplyStateType
     return { messages: [new AIMessage('网络异常，提交失败，请稍后重试或手动提交。')] }
   }
 }
-
-// ─── 图结构 ───
-
-export const applySubgraph = new StateGraph(ApplyState)
-  .addNode('fetchPolicy',     fetchPolicyNode)
-  .addNode('analyzeAndMatch', analyzeAndMatchNode)
-  .addNode('summarize',       summarizeNode)
-  .addNode('confirm',         confirmNode)
-  .addNode('submit',          submitNode)
-
-  .addEdge(START, 'fetchPolicy')
-  .addEdge('fetchPolicy', 'analyzeAndMatch')
-  .addEdge('analyzeAndMatch', 'summarize')
-  .addConditionalEdges('summarize', confirmRoute, {
-    confirm: 'confirm',
-    end:     END,
-  })
-  .addEdge('confirm', 'submit')
-  .addEdge('submit',  END)
-  .compile()

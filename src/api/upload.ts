@@ -1,9 +1,10 @@
+// ─── API 层工具：文件上传中间件 ────────────────────────────────────────────────
 import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const __dirname  = path.dirname(fileURLToPath(import.meta.url))
 export const UPLOAD_DIR = path.resolve(__dirname, '../../uploads')
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 

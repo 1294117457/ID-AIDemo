@@ -1,6 +1,7 @@
-// src/agent/prompts.ts
+// ─── Prompts — 所有提示词模板 ─────────────────────────────────────────────────
+// 集中管理，修改提示词只需改这一个文件
 
-/** classify 节点的意图分类 prompt */
+/** classifyNode 的意图分类 prompt */
 export function classifyPrompt(allUserText: string): string {
   return `分析以下用户的多轮输入，判断意图并提取信息。请以 JSON 格式返回结果。：
 
@@ -16,14 +17,15 @@ export function classifyPrompt(allUserText: string): string {
 ${allUserText}`
 }
 
-/** consult 子图的系统角色 prompt */
+/** consultNode 的系统角色 prompt */
 export function consultSystemPrompt(systemRole: string, context: string): string {
   return `${systemRole}\n\n【知识库检索结果】\n${context}`
 }
 
-/** apply 子图的材料分析 prompt */
+/** applyNode 的材料分析 System prompt */
 export const ANALYZE_SYSTEM = '你是厦门大学信息学院推免加分审核专家。分析证明材料，判断可以申请哪些加分项，以 JSON 格式返回结果，如果无匹配返回空数组。'
 
+/** applyNode 的材料分析 User prompt */
 export function analyzeUserPrompt(
   documentText: string,
   templatesJson: string,
@@ -56,18 +58,10 @@ ${policyContext}
 若无匹配项，suggestions 返回空数组 []。`
 }
 
-/** apply 子图的结果汇总（无匹配时） */
+/** 无匹配时的回复 */
 export const NO_MATCH_REPLY = '根据您提供的材料，暂未匹配到符合条件的加分项。请确认材料内容是否完整，或补充更多信息。'
 
-/** 申请信息不完整时的追问模板 */
-export function askForMorePrompt(missingFields: string[]): string {
-  return `申请材料不完整，还缺：${missingFields.join('、')}。请补充：`
-}
-
-/**
- * 生成感知历史的追问文本（用于 askForMoreNode LLM 调用）
- * 输出：一句≤60字的中文追问，告知已记录了什么，只询问缺少的部分
- */
+/** askForMoreNode 感知历史的追问 prompt */
 export function contextualAskPrompt(allUserText: string, missingFields: string[]): string {
   return `你是一个申请助手。根据用户已有输入，生成一句简洁友好的追问。
 要求：

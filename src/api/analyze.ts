@@ -1,16 +1,14 @@
+// ─── Layer 7 API: 证明材料分析路由（非 Agent 的快速分析入口） ─────────────────
 import { Router } from 'express'
-import multer from 'multer'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import fs from 'fs'
-import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { parseFileToText, searchKnowledge } from '../../services/knowledgeManager.js'
-import { getApiKey, getBaseUrl, getChatModel } from '../../services/aiConfig.js'
-import type { ScoreTemplate } from '../../types/scoreTemplate.js'
-import {createChatModel} from '../../services/llmService.js'
-import {upload} from '../../common/upload.js'
+import { upload } from './upload.js'
+import { parseFileToText, searchKnowledge } from '../rag.js'
+import { createChatModel } from '../model.js'
+import type { ScoreTemplate } from '../state.js'
 
+const router = Router()
 
 function extractJsonArray(text: string): string {
   const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
@@ -20,31 +18,17 @@ function extractJsonArray(text: string): string {
   return text.trim()
 }
 
-const router = Router()
-
-/**
- * POST /analyze/certificate
- *
- * Body (multipart/form-data):
- *   file      : PDF 文件
- *   templates : JSON 字符串，ScoreTemplate[] 列表（由 idbackend 传入）
- */
+/** POST /analyze/certificate — 上传证明材料，返回匹配建议 */
 router.post('/certificate', upload.single('file'), async (req, res) => {
-  if (!req.file) {
-    res.json({ code: 400, msg: '未收到文件', data: null })
-    return
-  }
+  if (!req.file) { res.json({ code: 400, msg: '未收到文件', data: null }); return }
 
-  const filePath = req.file.path
+  const filePath     = req.file.path
   const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
-  const hintExt = path.extname(originalName).toLowerCase() || '.pdf'
+  const hintExt      = path.extname(originalName).toLowerCase() || '.pdf'
 
   try {
     const certificateText = await parseFileToText(filePath, hintExt)
-    if (!certificateText.trim()) {
-      res.json({ code: 400, msg: 'PDF 内容为空或无法解析', data: null })
-      return
-    }
+    if (!certificateText.trim()) { res.json({ code: 400, msg: 'PDF 内容为空或无法解析', data: null }); return }
 
     let templates: ScoreTemplate[] = []
     const templatesRaw = req.body['templates'] as string | undefined
@@ -56,18 +40,13 @@ router.post('/certificate', upload.single('file'), async (req, res) => {
     }
 
     const policyContext = await searchKnowledge(certificateText.slice(0, 512), 5)
-
     const templatesForPrompt = templates.map(t => ({
-      id: t.id,
-      templateName: t.templateName,
-      templateType: t.templateType,
+      id: t.id, templateName: t.templateName, templateType: t.templateType,
       rules: t.rules.map(r => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
     }))
 
     const response = await createChatModel().invoke([
-      new SystemMessage(
-        '你是厦门大学信息学院推免加分审核专家。只输出 JSON 数组，不要任何解释文字，不要 markdown 代码块。'
-      ),
+      new SystemMessage('你是厦门大学信息学院推免加分审核专家。只输出 JSON 数组，不要任何解释文字，不要 markdown 代码块。'),
       new HumanMessage(`学生上传了以下证明材料：
 ---
 ${certificateText.slice(0, 2000)}
@@ -103,11 +82,7 @@ ${policyContext}
       console.error('[analyze/certificate] JSON 解析失败:', String(response.content).slice(0, 300))
     }
 
-    res.json({
-      code: 200,
-      msg: '成功',
-      data: { certificateText: certificateText.slice(0, 3000), suggestions }
-    })
+    res.json({ code: 200, msg: '成功', data: { certificateText: certificateText.slice(0, 3000), suggestions } })
   } catch (err) {
     console.error('[analyze/certificate]', err)
     res.json({ code: 500, msg: `分析失败: ${String(err)}`, data: null })
@@ -116,40 +91,26 @@ ${policyContext}
   }
 })
 
-/**
- * POST /analyze/generate
- *
- * Body (application/json):
- *   certificateText, selectedTemplateId, selectedRuleId, template
- */
+/** POST /analyze/generate — 根据选中的规则生成申请备注 */
 router.post('/generate', async (req, res) => {
   const { certificateText, selectedTemplateId, selectedRuleId, template } = req.body as {
-    certificateText?: string
+    certificateText?:  string
     selectedTemplateId?: number
-    selectedRuleId?: number
-    template?: ScoreTemplate
+    selectedRuleId?:   number
+    template?:         ScoreTemplate
   }
 
   if (!certificateText || selectedTemplateId == null || selectedRuleId == null || !template) {
-    res.json({
-      code: 400,
-      msg: '缺少必填字段: certificateText / selectedTemplateId / selectedRuleId / template',
-      data: null
-    })
+    res.json({ code: 400, msg: '缺少必填字段: certificateText / selectedTemplateId / selectedRuleId / template', data: null })
     return
   }
 
   const selectedRule = template.rules.find(r => r.id === selectedRuleId)
-  if (!selectedRule) {
-    res.json({ code: 400, msg: `模板中未找到 ruleId=${selectedRuleId}`, data: null })
-    return
-  }
+  if (!selectedRule) { res.json({ code: 400, msg: `模板中未找到 ruleId=${selectedRuleId}`, data: null }); return }
 
   try {
     const response = await createChatModel().invoke([
-      new SystemMessage(
-        '你是厦门大学信息学院推免加分申请助手。根据证明材料内容生成申请备注。只输出备注文本本身，不超过100字，不含任何其他内容。'
-      ),
+      new SystemMessage('你是厦门大学信息学院推免加分申请助手。根据证明材料内容生成申请备注。只输出备注文本本身，不超过100字，不含任何其他内容。'),
       new HumanMessage(`证明材料内容：
 ${certificateText.slice(0, 1500)}
 
@@ -159,15 +120,14 @@ ${certificateText.slice(0, 1500)}
     ])
 
     res.json({
-      code: 200,
-      msg: '成功',
+      code: 200, msg: '成功',
       data: {
         templateName: template.templateName,
         templateType: template.templateType,
-        scoreType: template.scoreType,
-        applyScore: selectedRule.ruleScore,
-        ruleId: selectedRuleId,
-        remark: String(response.content).trim()
+        scoreType:    template.scoreType,
+        applyScore:   selectedRule.ruleScore,
+        ruleId:       selectedRuleId,
+        remark:       String(response.content).trim(),
       }
     })
   } catch (err) {
