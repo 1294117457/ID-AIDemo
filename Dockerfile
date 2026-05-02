@@ -1,6 +1,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
+RUN apk add --no-cache python3 make g++ git
 RUN npm ci --legacy-peer-deps
 COPY .env .env
 COPY src ./src
