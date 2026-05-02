@@ -1,0 +1,1 @@
+docker build -t idagent:1.0 .
