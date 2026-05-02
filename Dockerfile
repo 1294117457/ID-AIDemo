@@ -1,12 +1,15 @@
-FROM node:22-alpine AS builder
+# 第一阶段：编译环境，使用完整的 node 镜像
+FROM node:22 AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN apk add --no-cache python3 make g++ git
 RUN npm ci --legacy-peer-deps
+# 复制源代码等
 COPY .env .env
 COPY src ./src
 RUN npm run build
 
+# 第二阶段：生产运行环境
+# 为了镜像大小，运行阶段可以保持使用 alpine，或者使用 node:22-slim
 FROM node:22-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
