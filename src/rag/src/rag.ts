@@ -1,22 +1,18 @@
-// src/rag/src/rag.ts
-// 职责：暴露 initKnowledge、searchKnowledge、ingestFile 等公开 API
+// ─── Layer: RAG — 知识库业务逻辑 ───────────────────────────────────────────────
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
-import { UPLOAD_DIR } from './store.js'
+import { UPLOAD_DIR, KNOWLEDGE_DIR } from './store.js'
 import { loadFile, splitAndTag } from './loader.js'
 import {
   addDocuments, similaritySearch,
-  resetStore, getAllDocuments,
+  deleteBySource, getAllDocuments,
   setFileMeta, removeFileMeta, listFileMeta,
 } from './store.js'
+import type { IngestResult } from './types.js'
 
-const __dirname = fileURLToPath(import.meta.url)
-export const KNOWLEDGE_DIR = path.resolve(__dirname, '../../../data/init_docs')
+// ── 公开 API ─────────────────────────────────────────────────────────────────
 
-// ── 公开 API ───────────────────────────────────────────────────────────────
-
-/** 启动时加载 docs/ 目录（幂等：已入库则跳过） */
+/** 启动时加载 init_docs/ 目录（幂等：已入库则跳过） */
 export async function initKnowledge(): Promise<void> {
   if (!fs.existsSync(KNOWLEDGE_DIR)) {
     console.warn('[rag] 目录不存在:', KNOWLEDGE_DIR)
@@ -40,9 +36,14 @@ export async function initKnowledge(): Promise<void> {
       if (docs.length === 0) continue
       const chunks = await splitAndTag(docs, file)
       await addDocuments(chunks)
-      setFileMeta(file, { chunkCount: chunks.length, textLength: chunks.reduce((s, c) => s + c.pageContent.length, 0) })
+      setFileMeta(file, {
+        chunkCount: chunks.length,
+        textLength: chunks.reduce((s, c) => s + c.pageContent.length, 0),
+      })
       console.log(`[rag] ✓ ${file} → ${chunks.length} 块`)
-    } catch (err) { console.error(`[rag] ✗ ${file}:`, err) }
+    } catch (err) {
+      console.error(`[rag] ✗ ${file}:`, err)
+    }
   }
   console.log('[rag] 初始化完毕')
 }
@@ -56,11 +57,14 @@ export async function searchKnowledge(query: string, topK = 5): Promise<string> 
   ).join('\n\n')
 }
 
-/** 上传文件入库 */
+/** 上传文件入库（幂等：先删旧数据再入库） */
 export async function ingestFile(
-  buffer: Buffer, fileName: string, mimeType?: string
-): Promise<{ chunkCount: number; textLength: number }> {
+  buffer: Buffer, fileName: string,
+): Promise<IngestResult> {
+  // 先删旧数据
   await removeSource(fileName)
+
+  // 临时文件用于 LangChain loader
   fs.mkdirSync(UPLOAD_DIR, { recursive: true })
   const tmpPath = path.join(UPLOAD_DIR, fileName)
   try {
@@ -69,12 +73,13 @@ export async function ingestFile(
     const docs = await loadFile(tmpPath, hintExt)
     const fullText = docs.map(d => d.pageContent).join('\n')
     if (!fullText.trim()) return { chunkCount: 0, textLength: 0 }
+
     const chunks = await splitAndTag(docs, fileName)
     await addDocuments(chunks)
     setFileMeta(fileName, { chunkCount: chunks.length, textLength: fullText.length })
     return { chunkCount: chunks.length, textLength: fullText.length }
   } finally {
-    fs.unlinkSync(tmpPath)
+    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath)
   }
 }
 
@@ -86,10 +91,11 @@ export async function parseFileToText(filePath: string, hintExt?: string): Promi
 
 /** 删除已入库文件 */
 export async function removeSource(sourceFile: string): Promise<void> {
+  // 检查文件是否存在
   const allDocs = await getAllDocuments()
-  const keepDocs = allDocs.filter(d => d.metadata?.sourceFile !== sourceFile)
-  resetStore()
-  if (keepDocs.length > 0) await addDocuments(keepDocs)
+  if (!allDocs.some(d => d.metadata?.sourceFile === sourceFile)) return
+
+  await deleteBySource(sourceFile)
   removeFileMeta(sourceFile)
 }
 

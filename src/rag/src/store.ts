@@ -1,166 +1,125 @@
-// src/rag/src/store.ts
-// 职责：向量检索 + 文档持久化
-// 实现：JSON 文件存储 + 余弦相似度检索（跨平台、无 Native 依赖）
+// ─── Layer: RAG Store — Chroma Embedded 持久化向量存储 ──────────────────────────
+// 实现：Chroma PersistentClient（内嵌单进程，无需单独服务，跨平台）
 import { Document } from '@langchain/core/documents'
+import { Chroma } from '@langchain/community/vectorstores/chroma'
+import { OpenAIEmbeddings } from '@langchain/openai'
+import type { Where } from 'chromadb'
 import { createEmbeddings } from '../../2model/model.js'
-import fs from 'fs'
-import path from 'path'
-import 'dotenv/config'
-
-import 'dotenv/config'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import fs from 'fs'
+import 'dotenv/config'
+
+// ── 路径定义 ─────────────────────────────────────────────────────────────────
 
 const __dirname = fileURLToPath(import.meta.url)
-const PROJECT_ROOT = path.resolve(__dirname, '../../..')
+const RAG_ROOT   = path.resolve(__dirname, '../..')
 
-export const UPLOAD_DIR      = path.resolve(PROJECT_ROOT, 'data/uploads')
-export const VEC_STORE_PATH  = path.resolve(PROJECT_ROOT, 'data/vec_store.json')
-export const META_PATH       = path.resolve(PROJECT_ROOT, 'data/rag_meta.json')
+export const RAG_DATA_DIR   = path.resolve(RAG_ROOT, 'data')
+export const UPLOAD_DIR      = path.resolve(RAG_ROOT, 'data/uploads')
+export const CHROMA_DIR      = path.resolve(RAG_ROOT, 'data/chroma')
+export const KNOWLEDGE_DIR   = path.resolve(RAG_ROOT, 'data/init_docs')
 
-export const COLLECTION_NAME = 'knowledge_base'
+const COLLECTION_NAME = 'knowledge_base'
 
-// ── 元数据管理 ────────────────────────────────────────────────────────────────
+// ── 内存元数据：记录哪些文件已入库 ────────────────────────────────────────────
+// 用 Map 替代 rag_meta.json，无需读写磁盘
 
-export interface FileMeta { chunkCount: number; textLength: number }
+interface FileMeta { chunkCount: number; textLength: number }
 
-function loadMeta(): Record<string, FileMeta> {
-  return fs.existsSync(META_PATH) ? JSON.parse(fs.readFileSync(META_PATH, 'utf8')) : {}
+const _fileMeta: Map<string, FileMeta> = new Map()
+
+// ── Chroma Client（单例） ─────────────────────────────────────────────────────
+
+let _vectorStore: Chroma | null = null
+
+async function getVectorStore(): Promise<Chroma> {
+  if (_vectorStore) return _vectorStore
+  fs.mkdirSync(CHROMA_DIR, { recursive: true })
+  _vectorStore = new Chroma(createEmbeddings(), {
+    url: process.env.CHROMA_URL,
+    collectionName: COLLECTION_NAME,
+  })
+  return _vectorStore
 }
 
-function saveMeta(meta: Record<string, FileMeta>) {
-  fs.mkdirSync(path.dirname(META_PATH), { recursive: true })
-  fs.writeFileSync(META_PATH, JSON.stringify(meta, null, 2))
-}
+// ── 公开 API ──────────────────────────────────────────────────────────────────
 
-// ── 向量存储 ────────────────────────────────────────────────────────────────
-
-export interface VecEntry {
-  id: string
-  content: string
-  source: string
-  metadata: string  // JSON string
-  vector: number[]
-}
-
-interface VecStore {
-  version: number
-  entries: VecEntry[]
-}
-
-function loadStore(): VecStore {
-  return fs.existsSync(VEC_STORE_PATH)
-    ? JSON.parse(fs.readFileSync(VEC_STORE_PATH, 'utf8'))
-    : { version: 1, entries: [] }
-}
-
-function saveStore(store: VecStore): void {
-  fs.mkdirSync(path.dirname(VEC_STORE_PATH), { recursive: true })
-  fs.writeFileSync(VEC_STORE_PATH, JSON.stringify(store, null, 2))
-}
-
-// ── Embeddings ───────────────────────────────────────────────────────────
-
-let _embedDimensions: number | null = null
-
-async function getEmbeddings() {
-  const embeddings = createEmbeddings()
-  if (!_embedDimensions) {
-    const vec = await embeddings.embedQuery('init')
-    _embedDimensions = vec.length
-  }
-  return embeddings
-}
-
-// ── 数学工具 ───────────────────────────────────────────────────────────────
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0, normA = 0, normB = 0
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]
-    normA += a[i] * a[i]
-    normB += b[i] * b[i]
-  }
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-10)
-}
-
-// ── 公开 API ───────────────────────────────────────────────────────────────
-
-/** 文档入库（幂等） */
+/** 文档入库 */
 export async function addDocuments(chunks: Document[]): Promise<void> {
   if (chunks.length === 0) return
-
-  const embeddings = await getEmbeddings()
-  const texts = chunks.map(c => c.pageContent)
-  const vectors = await embeddings.embedDocuments(texts)
-
-  const store = loadStore()
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i]
-    const id = chunk.metadata?.chunkId ?? `${Date.now()}_${i}`
-    const entry: VecEntry = {
-      id,
-      content: chunk.pageContent,
-      source: chunk.metadata?.sourceFile ?? '',
-      metadata: JSON.stringify(chunk.metadata ?? {}),
-      vector: vectors[i],
-    }
-
-    const existingIdx = store.entries.findIndex(e => e.id === id)
-    if (existingIdx >= 0) {
-      store.entries[existingIdx] = entry
-    } else {
-      store.entries.push(entry)
-    }
-  }
-
-  saveStore(store)
+  const store = await getVectorStore()
+  const ids = chunks.map((c, i) => c.metadata?.chunkId ?? `${Date.now()}_${i}`)
+  await store.addDocuments(chunks, { ids })
 }
 
 /** 语义检索 */
 export async function similaritySearch(query: string, topK: number): Promise<Document[]> {
-  if (_embedDimensions === null) return []
-
-  const embeddings = await getEmbeddings()
+  const store = await getVectorStore()
+  const embeddings = store.embeddings as OpenAIEmbeddings
   const queryVec = await embeddings.embedQuery(query)
-
-  const store = loadStore()
-  const scored = store.entries
-    .map(e => ({ e, sim: cosineSimilarity(queryVec, e.vector) }))
-    .sort((a, b) => b.sim - a.sim)
-    .slice(0, topK)
-
-  return scored.map(({ e }) => new Document({
-    pageContent: e.content,
-    metadata: JSON.parse(e.metadata ?? '{}'),
-  }))
+  const results = await store.similaritySearchVectorWithScore(queryVec, topK)
+  return results.map(([doc]) => doc)
 }
 
-/** 重置 store */
-export function resetStore(): void {
-  if (fs.existsSync(VEC_STORE_PATH)) {
-    fs.unlinkSync(VEC_STORE_PATH)
+/** 按 sourceFile 删除所有相关文档块 */
+export async function deleteBySource(sourceFile: string): Promise<void> {
+  const store = await getVectorStore()
+  try {
+    await store.delete({ filter: { sourceFile } as unknown as Where })
+  } catch {
+    // Chroma delete 在空结果时静默失败
   }
+}
+
+/** 重置向量库（清空 collection） */
+export async function resetStore(): Promise<void> {
+  const store = await getVectorStore()
+  const collection = await (store as unknown as { _collection: CollectionInstance })._collection
+  const result = await collection.get({ include: ['metadatas'] })
+  if (result.ids && result.ids.length > 0) {
+    await store.delete({ ids: result.ids as string[] })
+  }
+  _vectorStore = null
 }
 
 /** 全量查询 */
 export async function getAllDocuments(): Promise<Document[]> {
-  const store = loadStore()
-  return store.entries.map(e => new Document({
-    pageContent: e.content,
-    metadata: JSON.parse(e.metadata ?? '{}'),
-  }))
+  const store = await getVectorStore()
+  const collection = await (store as unknown as { _collection: CollectionInstance })._collection
+  const all = await collection.get({ include: ['documents', 'metadatas'] })
+  const docs: Document[] = []
+  for (let i = 0; i < (all.documents?.length ?? 0); i++) {
+    const content = all.documents?.[i]
+    if (content !== null && content !== undefined) {
+      docs.push(new Document({
+        pageContent: content,
+        metadata: (all.metadatas?.[i] as Record<string, unknown>) ?? {},
+      }))
+    }
+  }
+  return docs
 }
 
+// ── 元数据管理（内存 Map） ───────────────────────────────────────────────────
+
 export function setFileMeta(fileName: string, meta: FileMeta): void {
-  const m = loadMeta(); m[fileName] = meta; saveMeta(m)
+  _fileMeta.set(fileName, meta)
 }
 
 export function removeFileMeta(fileName: string): void {
-  const m = loadMeta(); delete m[fileName]; saveMeta(m)
+  _fileMeta.delete(fileName)
 }
 
 export function listFileMeta(): (FileMeta & { sourceFile: string })[] {
-  return Object.entries(loadMeta()).map(([sourceFile, meta]) => ({ sourceFile, ...meta }))
+  return Array.from(_fileMeta.entries()).map(([sourceFile, meta]) => ({ sourceFile, ...meta }))
+}
+
+// Chroma 底层 collection 实例类型
+interface CollectionInstance {
+  get(opts: { include?: string[] }): Promise<{
+    ids?: string[]
+    documents?: (string | null)[]
+    metadatas?: Record<string, unknown>[]
+  }>
 }
