@@ -19,7 +19,7 @@ async function main(): Promise<void> {
   console.log('[agent] 启动中...')
   initDb()
   await initKnowledge()
-  app.listen(PORT, () => console.log(`[agent] 运行中 → http://localhost:${PORT}`))
+  app.listen(PORT, '0.0.0.0', () => console.log(`[agent] 运行中 → http://0.0.0.0:${PORT}`))
 }
 
 main().catch(err => { console.error('[agent] 启动失败:', err); process.exit(1) })
