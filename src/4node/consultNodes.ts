@@ -3,7 +3,7 @@
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { createChatModel } from '../2model/model.js'
-import { searchKnowledge } from './rag.js'
+import { searchKnowledge } from '../rag/index.js'
 import { consultSystemPrompt } from './prompts.js'
 import { getSystemRole } from '../1config/config.js'
 import type { ConsultStateType } from '../3state/state.js'

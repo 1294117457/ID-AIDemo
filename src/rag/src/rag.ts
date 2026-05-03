@@ -8,13 +8,13 @@ import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf'
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx'
 import { CSVLoader } from '@langchain/community/document_loaders/fs/csv'
 import type { Document } from '@langchain/core/documents'
-import { createEmbeddings } from '../2model/model.js'
+import { createEmbeddings } from '../../2model/model.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname    = path.dirname(fileURLToPath(import.meta.url))
-const KNOWLEDGE_DIR = path.resolve(__dirname, '../../docs/0加分文件')
+const KNOWLEDGE_DIR = path.resolve(__dirname, '../docs')
 
 const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 500, chunkOverlap: 100 })
 

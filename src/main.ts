@@ -3,7 +3,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import { initDb } from './1config/config.js'
-import { initKnowledge } from './4node/rag.js'
+import { initKnowledge } from './rag/index.js'
 import apiRouter from './7api/index.js'
 
 const app  = express()

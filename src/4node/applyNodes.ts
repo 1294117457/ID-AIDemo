@@ -5,7 +5,7 @@ import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages
 import { interrupt } from '@langchain/langgraph'
 import { z } from 'zod'
 import { createChatModel } from '../2model/model.js'
-import { searchKnowledge } from './rag.js'
+import { searchKnowledge } from '../rag/index.js'
 import { ANALYZE_SYSTEM, analyzeUserPrompt } from './prompts.js'
 import type { ApplyStateType } from '../3state/state.js'
 

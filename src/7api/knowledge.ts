@@ -3,7 +3,7 @@ import { Router } from 'express'
 import path from 'path'
 import fs from 'fs'
 import { knowledgeUpload } from './upload.js'
-import { ingestFile, removeSource, listSources, getStats } from '../4node/rag.js'
+import { ingestFile, removeSource, listSources, getStats } from '../rag/index.js'
 
 const router = Router()
 
