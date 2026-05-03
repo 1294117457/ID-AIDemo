@@ -34,3 +34,8 @@ Thumbs.db
 temp/
 tmp/
 *.tmp
+
+# rag data
+/src/rag/data/chroma/
+/src/rag/data/uploads/
+/src/rag/data/rag_meta.json

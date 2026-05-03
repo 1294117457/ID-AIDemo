@@ -1,9 +1,8 @@
 // ─── Layer 7 API: 知识库管理路由 ──────────────────────────────────────────────
 import { Router } from 'express'
-import path from 'path'
-import fs from 'fs'
-import { knowledgeUpload } from './upload.js'
+import { knowledgeUpload } from '../rag/index.js'
 import { ingestFile, removeSource, listSources, getStats } from '../rag/index.js'
+import fs from 'fs'
 
 const router = Router()
 
@@ -24,11 +23,12 @@ router.post('/upload', knowledgeUpload.single('file'), async (req, res) => {
   if (!req.file) { res.json({ code: 400, msg: '未收到文件', data: null }); return }
 
   const fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
-  const filePath = req.file.path
-  const ext      = path.extname(fileName).toLowerCase()
+  const tmpPath  = req.file.path
+  const buffer   = fs.readFileSync(tmpPath)
+  fs.unlinkSync(tmpPath)  // API 层只管清理 multer 临时文件，rag 内部自管理
 
   try {
-    const result = await ingestFile(filePath, fileName, ext)
+    const result = await ingestFile(buffer, fileName)
     if (result.chunkCount === 0) {
       res.json({ code: 400, msg: '文件内容为空', data: { fileName, status: 'parse_empty' } })
       return
@@ -37,8 +37,6 @@ router.post('/upload', knowledgeUpload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('[knowledge/upload]', err)
     res.json({ code: 500, msg: `处理失败: ${err instanceof Error ? err.message : String(err)}`, data: { fileName, status: 'process_failed' } })
-  } finally {
-    fs.unlink(filePath, () => {})
   }
 })
 
