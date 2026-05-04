@@ -1,41 +1,39 @@
-// ─── RAG 上传配置（multer，不依赖 Express）─────────────────────────────────────
-// 由 rag 模块提供上传目录，API 层（7api）导入使用
+// ─── rag/src/upload.ts — 文件上传中间件 ─────────────────────────────────────────
 import multer from 'multer'
 import { UPLOAD_DIR } from './store.js'
 import fs from 'fs'
+import 'dotenv/config'
 
-/** 懒创建上传目录（避免模块顶层执行 mkdir） */
-function ensureUploadDir(): void {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+// ── 配置（直接从 .env 读取）───────────────────────────────────────────────────
+
+const MAX_FILE_SIZE_KB        = Number(process.env['MAX_FILE_SIZE_KB']        ?? 20480)
+const KNOWLEDGE_MAX_FILE_SIZE = Number(process.env['KNOWLEDGE_MAX_FILE_SIZE_KB'] ?? 20480)
+
+console.log(`[rag/upload] MAX_FILE_SIZE_KB=${MAX_FILE_SIZE_KB}, KNOWLEDGE_MAX_FILE_SIZE_KB=${KNOWLEDGE_MAX_FILE_SIZE}`)
+
+// ── 磁盘存储工厂 ─────────────────────────────────────────────────────────────
+
+function makeDiskStorage() {
+  return multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+      cb(null, UPLOAD_DIR)
+    },
+    filename: (_req, file, cb) => {
+      const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8')
+      cb(null, decoded)
+    },
+  })
 }
 
-/** 通用上传（任意文件类型，10MB 限制） */
+// ── 导出 ────────────────────────────────────────────────────────────────────
+
 export const upload = multer({
-  dest: UPLOAD_DIR,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      ensureUploadDir()
-      cb(null, UPLOAD_DIR)
-    },
-    filename: (_req, file, cb) => {
-      const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8')
-      cb(null, decoded)
-    },
-  }),
+  limits: { fileSize: MAX_FILE_SIZE_KB * 1024 },
+  storage: makeDiskStorage(),
 })
 
-/** 知识库上传（保留原始文件名，20MB 限制） */
 export const knowledgeUpload = multer({
-  limits: { fileSize: 20 * 1024 * 1024 },
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      ensureUploadDir()
-      cb(null, UPLOAD_DIR)
-    },
-    filename: (_req, file, cb) => {
-      const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8')
-      cb(null, decoded)
-    },
-  }),
+  limits: { fileSize: KNOWLEDGE_MAX_FILE_SIZE * 1024 },
+  storage: makeDiskStorage(),
 })

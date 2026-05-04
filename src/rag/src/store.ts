@@ -1,125 +1,188 @@
-// ─── Layer: RAG Store — Chroma Embedded 持久化向量存储 ──────────────────────────
-// 实现：Chroma PersistentClient（内嵌单进程，无需单独服务，跨平台）
-import { Document } from '@langchain/core/documents'
+// ─── rag/src/store.ts — Chroma 单一数据源（LangChain 公开 API） ─────────────────
 import { Chroma } from '@langchain/community/vectorstores/chroma'
-import { OpenAIEmbeddings } from '@langchain/openai'
 import type { Where } from 'chromadb'
+import { Document } from '@langchain/core/documents'
 import { createEmbeddings } from '../../2model/model.js'
 import { fileURLToPath } from 'url'
 import path from 'path'
-import fs from 'fs'
 import 'dotenv/config'
 
-// ── 路径定义 ─────────────────────────────────────────────────────────────────
+// ── 配置 ────────────────────────────────────────────────────────────────────
 
-const __dirname = fileURLToPath(import.meta.url)
-const RAG_ROOT   = path.resolve(__dirname, '../..')
-
-export const RAG_DATA_DIR   = path.resolve(RAG_ROOT, 'data')
-export const UPLOAD_DIR      = path.resolve(RAG_ROOT, 'data/uploads')
-export const CHROMA_DIR      = path.resolve(RAG_ROOT, 'data/chroma')
-export const KNOWLEDGE_DIR   = path.resolve(RAG_ROOT, 'data/init_docs')
-
+const CHROMA_URL      = process.env['CHROMA_URL'] ?? ''
+const CHUNK_SIZE      = Number(process.env['CHUNK_SIZE']    ?? 500)
+const CHUNK_OVERLAP   = Number(process.env['CHUNK_OVERLAP'] ?? 100)
 const COLLECTION_NAME = 'knowledge_base'
 
-// ── 内存元数据：记录哪些文件已入库 ────────────────────────────────────────────
-// 用 Map 替代 rag_meta.json，无需读写磁盘
+// ── 路径 ────────────────────────────────────────────────────────────────────
 
-interface FileMeta { chunkCount: number; textLength: number }
+const __dirname = fileURLToPath(import.meta.url)
+const RAG_ROOT  = path.resolve(__dirname, '../..')
 
-const _fileMeta: Map<string, FileMeta> = new Map()
+export const RAG_DATA_DIR  = path.resolve(RAG_ROOT, 'data')
+export const UPLOAD_DIR    = path.resolve(RAG_ROOT, 'data/uploads')
+export const KNOWLEDGE_DIR = path.resolve(RAG_ROOT, 'data/init_docs')
 
-// ── Chroma Client（单例） ─────────────────────────────────────────────────────
+// ── 类型 ─────────────────────────────────────────────────────────────────────
 
-let _vectorStore: Chroma | null = null
+interface FileMeta {
+  sourceFile: string
+  chunkCount: number
+  textLength: number
+}
 
-async function getVectorStore(): Promise<Chroma> {
-  if (_vectorStore) return _vectorStore
-  fs.mkdirSync(CHROMA_DIR, { recursive: true })
-  _vectorStore = new Chroma(createEmbeddings(), {
-    url: process.env.CHROMA_URL,
+// ── Chroma 单例（懒加载 + 失败重试） ───────────────────────────────────────────
+
+let _client: Chroma | null = null
+
+async function loadClient(): Promise<Chroma> {
+  if (_client) return _client
+  _client = new Chroma(createEmbeddings(), {
+    url: CHROMA_URL || undefined,
     collectionName: COLLECTION_NAME,
   })
-  return _vectorStore
+  return _client
 }
 
-// ── 公开 API ──────────────────────────────────────────────────────────────────
+// ── 向量操作（统一重试封装） ──────────────────────────────────────────────────
 
-/** 文档入库 */
-export async function addDocuments(chunks: Document[]): Promise<void> {
-  if (chunks.length === 0) return
-  const store = await getVectorStore()
-  const ids = chunks.map((c, i) => c.metadata?.chunkId ?? `${Date.now()}_${i}`)
-  await store.addDocuments(chunks, { ids })
-}
-
-/** 语义检索 */
-export async function similaritySearch(query: string, topK: number): Promise<Document[]> {
-  const store = await getVectorStore()
-  const embeddings = store.embeddings as OpenAIEmbeddings
-  const queryVec = await embeddings.embedQuery(query)
-  const results = await store.similaritySearchVectorWithScore(queryVec, topK)
-  return results.map(([doc]) => doc)
-}
-
-/** 按 sourceFile 删除所有相关文档块 */
-export async function deleteBySource(sourceFile: string): Promise<void> {
-  const store = await getVectorStore()
+async function getClientWithRetry<T>(fn: (client: Chroma) => Promise<T>): Promise<T> {
   try {
-    await store.delete({ filter: { sourceFile } as unknown as Where })
-  } catch {
-    // Chroma delete 在空结果时静默失败
-  }
-}
-
-/** 重置向量库（清空 collection） */
-export async function resetStore(): Promise<void> {
-  const store = await getVectorStore()
-  const collection = await (store as unknown as { _collection: CollectionInstance })._collection
-  const result = await collection.get({ include: ['metadatas'] })
-  if (result.ids && result.ids.length > 0) {
-    await store.delete({ ids: result.ids as string[] })
-  }
-  _vectorStore = null
-}
-
-/** 全量查询 */
-export async function getAllDocuments(): Promise<Document[]> {
-  const store = await getVectorStore()
-  const collection = await (store as unknown as { _collection: CollectionInstance })._collection
-  const all = await collection.get({ include: ['documents', 'metadatas'] })
-  const docs: Document[] = []
-  for (let i = 0; i < (all.documents?.length ?? 0); i++) {
-    const content = all.documents?.[i]
-    if (content !== null && content !== undefined) {
-      docs.push(new Document({
-        pageContent: content,
-        metadata: (all.metadatas?.[i] as Record<string, unknown>) ?? {},
-      }))
+    const client = await loadClient()
+    return await fn(client)
+  } catch (err) {
+    _client = null
+    try {
+      const client = await loadClient()
+      return await fn(client)
+    } catch (retryErr) {
+      console.error(`[rag/store] 操作失败（重试后仍失败）: ${retryErr}`)
+      throw retryErr
     }
   }
-  return docs
 }
 
-// ── 元数据管理（内存 Map） ───────────────────────────────────────────────────
-
-export function setFileMeta(fileName: string, meta: FileMeta): void {
-  _fileMeta.set(fileName, meta)
+export async function addDocuments(docs: Document[]): Promise<void> {
+  if (docs.length === 0) return
+  const ids = docs.map((d, i) => String(d.metadata?.chunkId ?? `${Date.now()}_${i}`))
+  await getClientWithRetry(async (client) => {
+    await client.addDocuments(docs, { ids })
+  })
 }
 
-export function removeFileMeta(fileName: string): void {
-  _fileMeta.delete(fileName)
+export async function similaritySearch(query: string, topK: number): Promise<Document[]> {
+  return getClientWithRetry(async (client) => {
+    return client.similaritySearch(query, topK)
+  })
 }
 
-export function listFileMeta(): (FileMeta & { sourceFile: string })[] {
-  return Array.from(_fileMeta.entries()).map(([sourceFile, meta]) => ({ sourceFile, ...meta }))
+// deleteBySource — 使用 LangChain 公开 API: client.delete({ filter })
+// filter 类型使用 chromadb 原生 Where 类型
+export async function deleteBySource(sourceFile: string): Promise<void> {
+  await getClientWithRetry(async (client) => {
+    await client.delete({ filter: { sourceFile } as unknown as Where })
+  })
 }
 
-// Chroma 底层 collection 实例类型
-interface CollectionInstance {
-  get(opts: { include?: string[] }): Promise<{
-    ids?: string[]
-    documents?: (string | null)[]
-    metadatas?: Record<string, unknown>[]
-  }>
+// resetStore — 直接使用原生 collection 的 deleteAll（deleteAll 不在 LangChain 封装中）
+export async function resetStore(): Promise<void> {
+  await getClientWithRetry(async (client) => {
+    const collection = await client.ensureCollection()
+    // @ts-ignore deleteAll 是 Chroma Collection 的原生参数，LangChain 类型未覆盖
+    await collection.delete({ deleteAll: true })
+    _client = null
+    console.log('[rag/store] 向量库已清空')
+  })
 }
+
+// getAllDocuments — 使用原生 collection 分页读取（offset 为 Chroma v2 特性）
+export async function getAllDocuments(): Promise<Document[]> {
+  return getClientWithRetry(async (client) => {
+    const collection = await client.ensureCollection()
+
+    const all: Document[] = []
+    const BATCH = 1000
+    let offset = 0
+
+    while (true) {
+      // @ts-ignore Chroma Collection 原生 API 支持 offset 分页
+      const result: {
+        documents?: (string | null)[]
+        metadatas?: Record<string, unknown>[]
+      } = await (collection as unknown as {
+        get(opts: { include?: string[]; limit?: number; offset?: number }): Promise<{
+          documents?: (string | null)[]
+          metadatas?: Record<string, unknown>[]
+        }>
+      }).get({ include: ['documents', 'metadatas'], limit: BATCH, offset })
+
+      const docs = result.documents ?? []
+      if (docs.length === 0) break
+
+      for (let i = 0; i < docs.length; i++) {
+        const content = docs[i]
+        if (content != null) {
+          all.push(new Document({
+            pageContent: content,
+            metadata: (result.metadatas?.[i] as Record<string, unknown>) ?? {},
+          }))
+        }
+      }
+
+      if (docs.length < BATCH) break
+      offset += BATCH
+    }
+
+    return all
+  })
+}
+
+// ── FileMeta 管理（从 Chroma 实时聚合，不再依赖 meta.json） ───────────────────────
+
+// listFileMeta — 使用原生 collection 分页读取（offset 为 Chroma v2 特性）
+// 不再依赖 meta.json，每次从 Chroma 实时聚合
+export async function listFileMeta(): Promise<FileMeta[]> {
+  return getClientWithRetry(async (client) => {
+    const collection = await client.ensureCollection()
+
+    const metaMap = new Map<string, FileMeta>()
+    const BATCH = 1000
+    let offset = 0
+
+    while (true) {
+      // @ts-ignore Chroma Collection 原生 API 支持 offset 分页
+      const result: {
+        documents?: (string | null)[]
+        metadatas?: Record<string, unknown>[]
+      } = await (collection as unknown as {
+        peek(opts: { limit?: number; offset?: number }): Promise<{
+          documents?: (string | null)[]
+          metadatas?: Record<string, unknown>[]
+        }>
+      }).peek({ limit: BATCH, offset })
+
+      const docs = result.documents ?? []
+      if (docs.length === 0) break
+
+      for (let i = 0; i < docs.length; i++) {
+        const sourceFile = result.metadatas?.[i]?.sourceFile as string | undefined
+        const content = docs[i]
+        if (!sourceFile || content == null) continue
+
+        if (!metaMap.has(sourceFile)) {
+          metaMap.set(sourceFile, { sourceFile, chunkCount: 0, textLength: 0 })
+        }
+        const m = metaMap.get(sourceFile)!
+        m.chunkCount++
+        m.textLength += content.length
+      }
+
+      if (docs.length < BATCH) break
+      offset += BATCH
+    }
+
+    return Array.from(metaMap.values())
+  })
+}
+
+export { CHUNK_SIZE, CHUNK_OVERLAP }

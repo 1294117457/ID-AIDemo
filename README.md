@@ -19,4 +19,4 @@ mkdir -p /data/chroma
 docker run -d  --name chroma   -p 8000:8000  -v /home/project/chroma:/chroma/chroma  chromadb/chroma:latest
 
 # 验证是否启动成功
-curl http://localhost:8000/api/v2/tenants
+curl http://223.109.49.63:8000/api/v2/tenants

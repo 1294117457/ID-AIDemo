@@ -1,0 +1,198 @@
+// ─── Layer 6: Agent Service — 对话编排与生命周期 ────────────────────────────
+
+import { HumanMessage, AIMessage } from '@langchain/core/messages'
+import { Command } from '@langchain/langgraph'
+import { getCompiledGraph } from '../5graph/graph.js'
+import { getContextMaxMessages } from '../1config/config.js'
+import { shouldCompress, compressMessages } from '../4node/memory.js'
+import { parseFileToText } from '../rag/index.js'
+import fs from 'fs'
+import type { AgentInput, AgentResult } from './types.js'
+import type { ScoreTemplate, UserInfo } from '../3state/state.js'
+import type { Request } from 'express'
+
+let _app: any = null
+async function getApp() {
+  if (!_app) _app = await getCompiledGraph()
+  return _app
+}
+
+// ── 状态提取 ──────────────────────────────────────────────────────────────────
+
+function extractResult(state: any): Omit<AgentResult, 'question'> {
+  const lastAI = (state.messages ?? [])
+    .filter((m: any) => m._getType?.() === 'ai')
+    .at(-1)
+  return {
+    interrupted:  false as const,
+    reply:        String(lastAI?.content ?? ''),
+    intent:       state.intent ?? 'consult',
+    documentText: state.documentText ?? '',
+    suggestions:  (state.checkResults ?? [])
+      .map((r: string) => { try { return JSON.parse(r) } catch { return null } })
+      .filter(Boolean),
+  }
+}
+
+async function checkInterrupt(config: { configurable: { thread_id: string } }): Promise<AgentResult | null> {
+  const app = await getApp()
+  const snapshot = await app.getState(config)
+  const interrupts = (snapshot.tasks ?? []).flatMap((t: any) => t.interrupts ?? [])
+  if (interrupts.length === 0) return null
+
+  const raw = interrupts[0].value
+  if (raw && typeof raw === 'object' && (raw as any).type === 'confirm') {
+    const data = raw as { type: 'confirm'; question: string; suggestions: any[] }
+    return { interrupted: true, question: data.question, suggestions: data.suggestions ?? [], reply: '', intent: 'apply', documentText: '' }
+  }
+  const question = typeof raw === 'string' ? raw : String(raw)
+  return {
+    interrupted:  true,
+    question,
+    suggestions:  [],
+    reply:        '',
+    intent:       (snapshot.values as any)?.intent ?? 'insufficient',
+    documentText: (snapshot.values as any)?.documentText ?? '',
+  }
+}
+
+async function compressIfNeeded(
+  app: any,
+  config: { configurable: { thread_id: string } }
+): Promise<{ compressed: boolean; previousCount: number; newCount: number }> {
+  const snapshot = await app.getState(config)
+  const messages = (snapshot.values as any)?.messages ?? []
+  const relevantMessages = messages.filter(
+    (m: any) => m._getType?.() === 'human' || m._getType?.() === 'ai'
+  ) as (HumanMessage | AIMessage)[]
+  const previousCount = relevantMessages.length
+  if (!shouldCompress(previousCount)) {
+    return { compressed: false, previousCount, newCount: previousCount }
+  }
+  const compressed = await compressMessages(relevantMessages)
+  await app.updateState(config, { messages: compressed })
+  const newCount = compressed.length
+  console.log(`[memory] compressed ${previousCount} → ${newCount} messages`)
+  return { compressed: true, previousCount, newCount }
+}
+
+// ── 公开 API ─────────────────────────────────────────────────────────────────
+
+export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
+  const config = { configurable: { thread_id: input.sessionId } }
+  const app = await getApp()
+  await compressIfNeeded(app, config)
+  const result = await app.invoke({
+    messages:     [new HumanMessage(input.userInput)],
+    documentText: input.documentText ?? '',
+    templates:    input.templates ?? [],
+    userInfo:     input.userInfo ?? null,
+  }, config)
+  const interruptResult = await checkInterrupt(config)
+  if (interruptResult) return interruptResult
+  return extractResult(result)
+}
+
+export async function resumeAgent(sessionId: string, supplement: string): Promise<AgentResult> {
+  const config = { configurable: { thread_id: sessionId } }
+  const app = await getApp()
+  const result = await app.invoke(new Command({ resume: supplement }), config)
+  const interruptResult = await checkInterrupt(config)
+  if (interruptResult) return interruptResult
+  return extractResult(result)
+}
+
+const SKIP_NODES = new Set(['classify', 'analyzeAndMatch', 'ask', 'summarize'])
+
+export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: string; data: any }> {
+  const config = { configurable: { thread_id: input.sessionId } }
+  const app = await getApp()
+
+  const compressResult = await compressIfNeeded(app, config)
+  if (compressResult.compressed) {
+    yield { type: 'context_compressed', data: { message: `上下文已自动压缩（${compressResult.previousCount} → ${compressResult.newCount} 条），继续对话。` } }
+  }
+
+  const eventStream = app.streamEvents(
+    { messages: [new HumanMessage(input.userInput)], documentText: input.documentText ?? '', templates: input.templates ?? [], userInfo: input.userInfo ?? null },
+    { ...config, version: 'v2' }
+  )
+
+  for await (const event of eventStream) {
+    if (event.event === 'on_chat_model_stream') {
+      const node = event.metadata?.langgraph_node
+      if (node && SKIP_NODES.has(node)) continue
+      const token = event.data?.chunk?.content
+      if (token) yield { type: 'token', data: { content: token } }
+    }
+  }
+
+  const interruptResult = await checkInterrupt(config)
+  if (interruptResult) {
+    yield { type: 'interrupt', data: { question: interruptResult.question, suggestions: interruptResult.suggestions, requireFiles: interruptResult.suggestions.length > 0 } }
+    return
+  }
+  const snapshot = await app.getState(config)
+  yield { type: 'result', data: extractResult(snapshot.values as any) }
+}
+
+export async function* streamResume(sessionId: string, supplement: string): AsyncGenerator<{ type: string; data: any }> {
+  const config = { configurable: { thread_id: sessionId } }
+  const app = await getApp()
+
+  await compressIfNeeded(app, config)
+
+  const eventStream = app.streamEvents(new Command({ resume: supplement }), { ...config, version: 'v2' })
+
+  for await (const event of eventStream) {
+    if (event.event === 'on_chat_model_stream') {
+      const node = event.metadata?.langgraph_node
+      if (node && SKIP_NODES.has(node)) continue
+      const token = event.data?.chunk?.content
+      if (token) yield { type: 'token', data: { content: token } }
+    }
+  }
+
+  const interruptResult = await checkInterrupt(config)
+  if (interruptResult) {
+    yield { type: 'interrupt', data: { question: interruptResult.question, suggestions: interruptResult.suggestions, requireFiles: interruptResult.suggestions.length > 0 } }
+    return
+  }
+  const snapshot = await app.getState(config)
+  yield { type: 'result', data: extractResult(snapshot.values as any) }
+}
+
+// ── 参数解析（从 HTTP 请求中提取业务数据）──────────────────────────────────────
+
+function decodeFileName(name: string) {
+  return Buffer.from(name, 'latin1').toString('utf8')
+}
+
+export interface ParsedAgentParams {
+  userInput:    string
+  sessionId:   string
+  documentText: string
+  templates:   ScoreTemplate[]
+  userInfo:    UserInfo | null
+}
+
+export async function parseAgentParams(req: Request): Promise<ParsedAgentParams> {
+  const body = req.body as any
+  const userInput  = String(body.message ?? '').trim()
+  const sessionId = body.sessionId ?? 'default'
+
+  let documentText = ''
+  if (req.file) {
+    const name = decodeFileName(req.file.originalname)
+    const ext  = name.includes('.') ? `.${name.split('.').pop()}` : ''
+    documentText = await parseFileToText(req.file.path, ext)
+    fs.unlink(req.file.path, () => {})
+  }
+
+  let templates: ScoreTemplate[] = []
+  let userInfo: UserInfo | null = null
+  try { if (body.templates) templates = JSON.parse(body.templates) } catch {}
+  try { if (body.userInfo) userInfo   = JSON.parse(body.userInfo) } catch {}
+
+  return { userInput, sessionId, documentText, templates, userInfo }
+}
