@@ -9,6 +9,7 @@ export interface AgentInput {
   sessionId:    string
   userInfo?:    UserInfo | null
   userId?:      string   // 用户身份，由 idbackend 通过 x-user-id 头传递，用于会话持久化
+  forcedIntent?: 'consult' | 'apply' | null  // 申请入口注入，强制跳过 LLM 分类
 }
 
 export interface AgentResult {

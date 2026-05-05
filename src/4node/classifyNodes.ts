@@ -20,6 +20,12 @@ const ClassifySchema = z.object({
 })
 
 export async function classifyNode(state: MainStateType): Promise<Partial<MainStateType>> {
+  // 申请入口优先：forcedIntent 直接指定 intent，跳过 LLM 分类
+  if (state.forcedIntent) {
+    console.log(`-main:classifyNode: forcedIntent=${state.forcedIntent}，跳过 LLM 分类`)
+    return { intent: state.forcedIntent }
+  }
+
   const allUserText = state.messages
     .filter(m => m instanceof HumanMessage)
     .map(m => String(m.content))

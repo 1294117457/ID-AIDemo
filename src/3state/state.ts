@@ -39,6 +39,8 @@ export const MainState = Annotation.Root({
 
   // 流程控制（替换）
   intent:      Annotation<'consult' | 'apply' | 'insufficient'>({ reducer: (_, x) => x, default: () => 'consult' }),
+  // forcedIntent：申请入口专用，优先级高于 classifyNode 的 LLM 分类
+  forcedIntent: Annotation<'consult' | 'apply' | null>({ reducer: (_, x) => x, default: () => null }),
   missingInfo: Annotation<string[]>({ reducer: (_, x) => x, default: () => [] }),
 
   // 业务数据（替换）

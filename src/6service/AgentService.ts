@@ -6,7 +6,7 @@ import { getCompiledGraph } from '../5graph/graph.js'
 import { getContextMaxMessages } from '../1config/config.js'
 import { shouldCompress, compressMessages } from '../4node/memory.js'
 import { parseFileToText } from '../rag/index.js'
-import { appendMessage } from './ConversationService.js'
+import { appendMessage, getConversationBySession } from './ConversationService.js'
 import fs from 'fs'
 import type { AgentInput, AgentResult } from './types.js'
 import type { ScoreTemplate, UserInfo } from '../3state/state.js'
@@ -83,7 +83,7 @@ export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
   const config = { configurable: { thread_id: input.sessionId } }
   const app = await getApp()
   if (input.userId) {
-    appendMessage(input.sessionId, 'user', input.userInput)
+    safeAppendMessage(input.sessionId, input.userId, 'user', input.userInput)
   }
   await compressIfNeeded(app, config)
   const result = await app.invoke({
@@ -91,11 +91,12 @@ export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
     documentText: input.documentText ?? '',
     templates:    input.templates ?? [],
     userInfo:     input.userInfo ?? null,
+    forcedIntent: input.forcedIntent ?? null,
   }, config)
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
     if (input.userId) {
-      appendMessage(input.sessionId, 'interrupt', interruptResult.question ?? '', 'interrupt')
+      safeAppendMessage(input.sessionId, input.userId, 'interrupt', interruptResult.question ?? '', 'interrupt')
     }
     return interruptResult
   }
@@ -104,7 +105,7 @@ export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
       .filter((m: any) => m._getType?.() === 'ai')
       .at(-1)
     if (lastAI?.content) {
-      appendMessage(input.sessionId, 'assistant', String(lastAI.content))
+      safeAppendMessage(input.sessionId, input.userId, 'assistant', String(lastAI.content))
     }
   }
   return extractResult(result)
@@ -127,7 +128,7 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
 
   // 追加用户消息到 SQLite
   if (input.userId) {
-    appendMessage(input.sessionId, 'user', input.userInput)
+    safeAppendMessage(input.sessionId, input.userId, 'user', input.userInput)
   }
 
   const compressResult = await compressIfNeeded(app, config)
@@ -138,7 +139,7 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
   // 累积 AI 回复，写入 SQLite
   let assistantContent = ''
   const eventStream = app.streamEvents(
-    { messages: [new HumanMessage(input.userInput)], documentText: input.documentText ?? '', templates: input.templates ?? [], userInfo: input.userInfo ?? null },
+    { messages: [new HumanMessage(input.userInput)], documentText: input.documentText ?? '', templates: input.templates ?? [], userInfo: input.userInfo ?? null, forcedIntent: input.forcedIntent ?? null },
     { ...config, version: 'v2' }
   )
 
@@ -156,14 +157,14 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
 
   // 流结束后写入 AI 回复到 SQLite
   if (input.userId && assistantContent) {
-    appendMessage(input.sessionId, 'assistant', assistantContent)
+    safeAppendMessage(input.sessionId, input.userId, 'assistant', assistantContent)
   }
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
     // interrupt 消息也写入 SQLite
     if (input.userId) {
-      appendMessage(input.sessionId, 'interrupt', interruptResult.question ?? '', 'interrupt')
+      safeAppendMessage(input.sessionId, input.userId, 'interrupt', interruptResult.question ?? '', 'interrupt')
     }
     yield { type: 'interrupt', data: { question: interruptResult.question, suggestions: interruptResult.suggestions, requireFiles: interruptResult.suggestions.length > 0 } }
     return
@@ -178,7 +179,7 @@ export async function* streamResume(sessionId: string, supplement: string, userI
 
   // 写入用户的补充消息到 SQLite
   if (userId) {
-    appendMessage(sessionId, 'user', supplement)
+    safeAppendMessage(sessionId, userId, 'user', supplement)
   }
 
   await compressIfNeeded(app, config)
@@ -200,13 +201,13 @@ export async function* streamResume(sessionId: string, supplement: string, userI
 
   // 流结束后写入 AI 回复
   if (userId && assistantContent) {
-    appendMessage(sessionId, 'assistant', assistantContent)
+    safeAppendMessage(sessionId, userId, 'assistant', assistantContent)
   }
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
     if (userId) {
-      appendMessage(sessionId, 'interrupt', interruptResult.question ?? '', 'interrupt')
+      safeAppendMessage(sessionId, userId, 'interrupt', interruptResult.question ?? '', 'interrupt')
     }
     yield { type: 'interrupt', data: { question: interruptResult.question, suggestions: interruptResult.suggestions, requireFiles: interruptResult.suggestions.length > 0 } }
     return
@@ -223,11 +224,13 @@ function decodeFileName(name: string) {
 
 export interface ParsedAgentParams {
   userInput:    string
-  sessionId:   string
+  sessionId:    string
   userId:      string | null
   documentText: string
-  templates:   ScoreTemplate[]
+  templates:    ScoreTemplate[]
   userInfo:    UserInfo | null
+  // 申请入口注入：强制走 applyGraph，跳过 classifyNode 的 LLM 分类
+  forcedIntent: 'consult' | 'apply' | null
 }
 
 export async function parseAgentParams(req: Request): Promise<ParsedAgentParams> {
@@ -250,5 +253,39 @@ export async function parseAgentParams(req: Request): Promise<ParsedAgentParams>
   try { if (body.templates) templates = JSON.parse(body.templates) } catch {}
   try { if (body.userInfo) userInfo   = JSON.parse(body.userInfo) } catch {}
 
-  return { userInput, sessionId, userId, documentText, templates, userInfo }
+  // forcedIntent 支持：申请入口传入 intent=apply，强制跳过 LLM 分类
+  const forcedIntent = (body.intent === 'apply' || body.intent === 'consult')
+    ? body.intent as 'consult' | 'apply'
+    : null
+
+  return { userInput, sessionId, userId, documentText, templates, userInfo, forcedIntent }
+}
+
+/**
+ * 安全写入消息：确保会话属于当前用户，防止串会话
+ */
+function safeAppendMessage(sessionId: string, userId: string | null, role: string, content: string, msgType = 'message', extraData?: any): void {
+  try {
+    // 验证会话归属（仅在有 userId 且会话已存在时验证）
+    // 会话可能尚未创建（新建会话流程中），此时跳过验证直接写入
+    if (userId) {
+      const conv = getConversationBySession(sessionId)
+      if (conv) {
+        // 会话已存在于数据库，验证归属
+        if (conv.user_id !== userId) {
+          console.warn(`[persist] 安全拦截：会话 ${sessionId} 属于 ${conv.user_id}，拒绝用户 ${userId} 写入`)
+          return
+        }
+        console.log(`[persist] ✓ 保存 ${role} 消息，会话=${sessionId}，用户=${userId}，内容长度=${content.length}`)
+      } else {
+        // 会话尚未创建（如新建会话流程中），直接写入
+        console.log(`[persist] ✓ 保存 ${role} 消息（会话 ${sessionId} 尚未创建），用户=${userId}，内容长度=${content.length}`)
+      }
+    } else {
+      console.log(`[persist] ✓ 保存 ${role} 消息，会话=${sessionId}，用户=匿名，内容长度=${content.length}`)
+    }
+    appendMessage(sessionId, role, content, msgType, extraData)
+  } catch (e) {
+    console.error(`[persist] ✗ 保存消息失败，会话=${sessionId}，角色=${role}，错误:`, e)
+  }
 }

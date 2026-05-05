@@ -60,14 +60,19 @@ export function createConversation(userId: string, firstMessage = ''): { id: num
 
 /**
  * 获取指定用户的所有会话列表（按更新时间倒序）
+ * last_message = 该会话最新一条用户消息或 AI 回复的 content（子查询保证正确取最新）
  */
 export function getConversations(userId: string, limit = 50, offset = 0): ConversationMeta[] {
   const db = getDb()
   return db.prepare(`
     SELECT
       c.id, c.user_id, c.session_id, c.title, c.status, c.is_deleted, c.created_at, c.updated_at,
-      COUNT(m.id)        AS message_count,
-      MAX(m.content)     AS last_message
+      COUNT(m.id) AS message_count,
+      (
+        SELECT content FROM ai_message
+        WHERE session_id = c.session_id
+        ORDER BY created_at DESC LIMIT 1
+      ) AS last_message
     FROM ai_conversation c
     LEFT JOIN ai_message m ON m.session_id = c.session_id
     WHERE c.user_id = ? AND c.is_deleted = 0
@@ -84,8 +89,12 @@ export function getConversationBySession(sessionId: string): ConversationMeta | 
   const db = getDb()
   const row = db.prepare(`
     SELECT c.id, c.user_id, c.session_id, c.title, c.status, c.is_deleted, c.created_at, c.updated_at,
-           COUNT(m.id)    AS message_count,
-           MAX(m.content) AS last_message
+           COUNT(m.id) AS message_count,
+           (
+             SELECT content FROM ai_message
+             WHERE session_id = c.session_id
+             ORDER BY created_at DESC LIMIT 1
+           ) AS last_message
     FROM ai_conversation c
     LEFT JOIN ai_message m ON m.session_id = c.session_id
     WHERE c.session_id = ? AND c.is_deleted = 0
@@ -154,8 +163,12 @@ export function searchConversations(userId: string, keyword: string): Conversati
   const k = `%${keyword.trim()}%`
   return db.prepare(`
     SELECT c.id, c.user_id, c.session_id, c.title, c.status, c.is_deleted, c.created_at, c.updated_at,
-           COUNT(m.id)    AS message_count,
-           MAX(m.content) AS last_message
+           COUNT(m.id) AS message_count,
+           (
+             SELECT content FROM ai_message
+             WHERE session_id = c.session_id
+             ORDER BY created_at DESC LIMIT 1
+           ) AS last_message
     FROM ai_conversation c
     LEFT JOIN ai_message m ON m.session_id = c.session_id
     WHERE c.user_id = ? AND c.is_deleted = 0
