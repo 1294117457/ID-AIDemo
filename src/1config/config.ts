@@ -31,6 +31,35 @@ export function initDb(): void {
       updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
+    -- ── 会话元数据表 ──────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS ai_conversation (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     TEXT    NOT NULL,
+      session_id  TEXT    NOT NULL UNIQUE,
+      title       TEXT    NOT NULL DEFAULT '新对话',
+      status      INTEGER NOT NULL DEFAULT 1,
+      is_deleted  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT    NOT NULL,
+      updated_at  TEXT    NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_conv_user     ON ai_conversation(user_id);
+    CREATE INDEX IF NOT EXISTS idx_conv_session ON ai_conversation(session_id);
+
+    -- ── 消息记录表 ────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS ai_message (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id  TEXT    NOT NULL,
+      role        TEXT    NOT NULL,
+      content     TEXT    NOT NULL,
+      msg_type    TEXT    NOT NULL DEFAULT 'message',
+      extra_data  TEXT,
+      created_at  TEXT    NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_msg_session ON ai_message(session_id);
+    CREATE INDEX IF NOT EXISTS idx_msg_created ON ai_message(created_at);
+  `)
+
+  _db.exec(`
     INSERT OR IGNORE INTO ai_config (config_key, config_value) VALUES
       ('system_role',          '你是厦门大学信息学院保研加分助手。你的职责是：帮助学生和老师了解保研综合成绩加分政策、申请流程及系统操作。回答时请以下列知识库内容为主要依据，如果知识库没有相关信息，请如实告知。回答语言：中文，简洁专业。'),
       ('api_key',              ''),

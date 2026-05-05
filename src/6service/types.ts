@@ -8,6 +8,7 @@ export interface AgentInput {
   templates?:   ScoreTemplate[]
   sessionId:    string
   userInfo?:    UserInfo | null
+  userId?:      string   // 用户身份，由 idbackend 通过 x-user-id 头传递，用于会话持久化
 }
 
 export interface AgentResult {

@@ -11,7 +11,7 @@ router.post('/chat', upload.single('file'), async (req, res) => {
   try {
     const p = await parseAgentParams(req)
     if (!p.userInput && !p.documentText) { res.status(400).json({ code: 400, msg: '请输入文字或上传文件', data: null }); return }
-    res.json({ code: 200, msg: '成功', data: await invokeAgent(p) })
+    res.json({ code: 200, msg: '成功', data: await invokeAgent({ ...p, userId: p.userId ?? undefined }) })
   } catch (e) { res.json({ code: 500, msg: String(e), data: null }) }
 })
 
@@ -21,7 +21,7 @@ router.post('/stream', upload.single('file'), async (req, res) => {
     const p = await parseAgentParams(req)
     if (!p.userInput && !p.documentText) { res.status(400).json({ code: 400, msg: '请输入文字或上传文件', data: null }); return }
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' })
-    for await (const event of streamAgent(p)) {
+    for await (const event of streamAgent({ ...p, userId: p.userId ?? undefined })) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
   } catch (e) { res.write(`data: ${JSON.stringify({ type: 'error', data: { message: String(e) } })}\n\n`) }
@@ -41,9 +41,10 @@ router.post('/resume', async (req, res) => {
 router.post('/resume-stream', async (req, res) => {
   const body = req.body as AgentResumeBody
   if (!body.sessionId || !body.supplement?.trim()) { res.status(400).json({ code: 400, msg: '缺少 sessionId 或 supplement', data: null }); return }
+  const userId = (req.headers['x-user-id'] as string) || undefined
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' })
   try {
-    for await (const event of streamResume(body.sessionId, body.supplement.trim())) {
+    for await (const event of streamResume(body.sessionId, body.supplement.trim(), userId)) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
   } catch (e) { res.write(`data: ${JSON.stringify({ type: 'error', data: { message: String(e) } })}\n\n`) }

@@ -6,6 +6,7 @@ import { getCompiledGraph } from '../5graph/graph.js'
 import { getContextMaxMessages } from '../1config/config.js'
 import { shouldCompress, compressMessages } from '../4node/memory.js'
 import { parseFileToText } from '../rag/index.js'
+import { appendMessage } from './ConversationService.js'
 import fs from 'fs'
 import type { AgentInput, AgentResult } from './types.js'
 import type { ScoreTemplate, UserInfo } from '../3state/state.js'
@@ -81,6 +82,9 @@ async function compressIfNeeded(
 export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
   const config = { configurable: { thread_id: input.sessionId } }
   const app = await getApp()
+  if (input.userId) {
+    appendMessage(input.sessionId, 'user', input.userInput)
+  }
   await compressIfNeeded(app, config)
   const result = await app.invoke({
     messages:     [new HumanMessage(input.userInput)],
@@ -89,7 +93,20 @@ export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
     userInfo:     input.userInfo ?? null,
   }, config)
   const interruptResult = await checkInterrupt(config)
-  if (interruptResult) return interruptResult
+  if (interruptResult) {
+    if (input.userId) {
+      appendMessage(input.sessionId, 'interrupt', interruptResult.question ?? '', 'interrupt')
+    }
+    return interruptResult
+  }
+  if (input.userId && result) {
+    const lastAI = (result.messages ?? [])
+      .filter((m: any) => m._getType?.() === 'ai')
+      .at(-1)
+    if (lastAI?.content) {
+      appendMessage(input.sessionId, 'assistant', String(lastAI.content))
+    }
+  }
   return extractResult(result)
 }
 
@@ -108,11 +125,18 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
   const config = { configurable: { thread_id: input.sessionId } }
   const app = await getApp()
 
+  // 追加用户消息到 SQLite
+  if (input.userId) {
+    appendMessage(input.sessionId, 'user', input.userInput)
+  }
+
   const compressResult = await compressIfNeeded(app, config)
   if (compressResult.compressed) {
     yield { type: 'context_compressed', data: { message: `上下文已自动压缩（${compressResult.previousCount} → ${compressResult.newCount} 条），继续对话。` } }
   }
 
+  // 累积 AI 回复，写入 SQLite
+  let assistantContent = ''
   const eventStream = app.streamEvents(
     { messages: [new HumanMessage(input.userInput)], documentText: input.documentText ?? '', templates: input.templates ?? [], userInfo: input.userInfo ?? null },
     { ...config, version: 'v2' }
@@ -123,12 +147,24 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
       const node = event.metadata?.langgraph_node
       if (node && SKIP_NODES.has(node)) continue
       const token = event.data?.chunk?.content
-      if (token) yield { type: 'token', data: { content: token } }
+      if (token) {
+        assistantContent += token
+        yield { type: 'token', data: { content: token } }
+      }
     }
+  }
+
+  // 流结束后写入 AI 回复到 SQLite
+  if (input.userId && assistantContent) {
+    appendMessage(input.sessionId, 'assistant', assistantContent)
   }
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
+    // interrupt 消息也写入 SQLite
+    if (input.userId) {
+      appendMessage(input.sessionId, 'interrupt', interruptResult.question ?? '', 'interrupt')
+    }
     yield { type: 'interrupt', data: { question: interruptResult.question, suggestions: interruptResult.suggestions, requireFiles: interruptResult.suggestions.length > 0 } }
     return
   }
@@ -136,25 +172,42 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
   yield { type: 'result', data: extractResult(snapshot.values as any) }
 }
 
-export async function* streamResume(sessionId: string, supplement: string): AsyncGenerator<{ type: string; data: any }> {
+export async function* streamResume(sessionId: string, supplement: string, userId?: string): AsyncGenerator<{ type: string; data: any }> {
   const config = { configurable: { thread_id: sessionId } }
   const app = await getApp()
+
+  // 写入用户的补充消息到 SQLite
+  if (userId) {
+    appendMessage(sessionId, 'user', supplement)
+  }
 
   await compressIfNeeded(app, config)
 
   const eventStream = app.streamEvents(new Command({ resume: supplement }), { ...config, version: 'v2' })
 
+  let assistantContent = ''
   for await (const event of eventStream) {
     if (event.event === 'on_chat_model_stream') {
       const node = event.metadata?.langgraph_node
       if (node && SKIP_NODES.has(node)) continue
       const token = event.data?.chunk?.content
-      if (token) yield { type: 'token', data: { content: token } }
+      if (token) {
+        assistantContent += token
+        yield { type: 'token', data: { content: token } }
+      }
     }
+  }
+
+  // 流结束后写入 AI 回复
+  if (userId && assistantContent) {
+    appendMessage(sessionId, 'assistant', assistantContent)
   }
 
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
+    if (userId) {
+      appendMessage(sessionId, 'interrupt', interruptResult.question ?? '', 'interrupt')
+    }
     yield { type: 'interrupt', data: { question: interruptResult.question, suggestions: interruptResult.suggestions, requireFiles: interruptResult.suggestions.length > 0 } }
     return
   }
@@ -171,6 +224,7 @@ function decodeFileName(name: string) {
 export interface ParsedAgentParams {
   userInput:    string
   sessionId:   string
+  userId:      string | null
   documentText: string
   templates:   ScoreTemplate[]
   userInfo:    UserInfo | null
@@ -180,6 +234,8 @@ export async function parseAgentParams(req: Request): Promise<ParsedAgentParams>
   const body = req.body as any
   const userInput  = String(body.message ?? '').trim()
   const sessionId = body.sessionId ?? 'default'
+  // x-user-id 由 idbackend 从 JWT Token 中解析后注入
+  const userId = (req.headers['x-user-id'] as string) || null
 
   let documentText = ''
   if (req.file) {
@@ -194,5 +250,5 @@ export async function parseAgentParams(req: Request): Promise<ParsedAgentParams>
   try { if (body.templates) templates = JSON.parse(body.templates) } catch {}
   try { if (body.userInfo) userInfo   = JSON.parse(body.userInfo) } catch {}
 
-  return { userInput, sessionId, documentText, templates, userInfo }
+  return { userInput, sessionId, userId, documentText, templates, userInfo }
 }
