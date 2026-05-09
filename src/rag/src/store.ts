@@ -45,7 +45,11 @@ async function loadClient(): Promise<Chroma> {
 }
 
 // ── 向量操作（统一重试封装） ──────────────────────────────────────────────────
-
+/**
+ * 
+ *  Chroma 客户端封装
+ * 
+ */
 async function getClientWithRetry<T>(fn: (client: Chroma) => Promise<T>): Promise<T> {
   try {
     const client = await loadClient()
