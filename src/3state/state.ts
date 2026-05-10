@@ -3,26 +3,7 @@
 // Reducer 规律：消息用累加、业务字段用替换 (_, x) => x
 
 import { MessagesAnnotation, Annotation } from '@langchain/langgraph'
-
-// ── 类型定义 ──────────────────────────────────────────────────────────────
-
-export interface TemplateRule {
-  id:           number
-  ruleName:     string
-  ruleScore:    number
-  description?: string
-}
-
-export interface ScoreTemplate {
-  id:               number
-  templateName:     string
-  templateType:     string   // CONDITION | TRANSFORM
-  scoreType:        number   // 0/1/2
-  templateMaxScore?: number
-  reviewCount?:     number
-  description?:     string
-  rules:            TemplateRule[]
-}
+import type { ScoreTemplate, TemplateRule } from '../types/shared.js'
 
 // ── MainState — 主图控制 ─────────────────────────────────────────────────
 
@@ -45,13 +26,16 @@ export const MainState = Annotation.Root({
     reducer: (_, x) => x,
     default: () => [] as string[],
   }),
+
+  // documentText：用户上传材料原文，classifyNode 提取，apply 子图消费
+  documentText: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
 })
 
 export type MainStateType = typeof MainState.State
 
 // ── ApplyState — apply 子图 ──────────────────────────────────────────────
-
 // LangGraph 子图必须与父图共享状态结构，故 ApplyState 在 MainState 基础上扩展
+
 export const ApplyState = Annotation.Root({
   ...MessagesAnnotation.spec,
 

@@ -40,10 +40,10 @@ export async function getCompiledGraph() {
     // ── 申请子图 ─────────────────────────────────────────
     const applySubgraph = new StateGraph(ApplyState)
       .addNode('fetchPolicy',     fetchPolicyNode)
-      .addNode('analyzeAndMatch', (state, config) => analyzeMatchNode(state, config))
+      .addNode('analyzeAndMatch', (state, config: any) => analyzeMatchNode(state, config))
       .addNode('summarize',       summarizeNode)
       .addNode('confirm',         confirmNode)
-      .addNode('submit',          (state, config) => submitNode(state, config))
+      .addNode('submit',          (state, config: any) => submitNode(state, config))
       .addEdge(START, 'fetchPolicy')
       .addEdge('fetchPolicy', 'analyzeAndMatch')
       .addEdge('analyzeAndMatch', 'summarize')
@@ -54,7 +54,7 @@ export async function getCompiledGraph() {
 
     // ── 主图 ─────────────────────────────────────────────
     const checkpointer = SqliteSaver.fromConnString(CHECKPOINT_PATH)
-    _compiled = new StateGraph(MainState)
+    const mainGraph = new StateGraph(MainState)
       .addNode('classify',     classifyNode)
       .addNode('ask',          askForMoreNode)
       .addNode('applyGraph',   applySubgraph)
@@ -69,6 +69,7 @@ export async function getCompiledGraph() {
       .addEdge('applyGraph',   END)
       .addEdge('consultGraph', END)
       .compile({ checkpointer })
+    _compiled = mainGraph
   }
   return _compiled
 }

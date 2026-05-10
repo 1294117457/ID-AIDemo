@@ -9,7 +9,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import type { ApplyStateType } from '../../../3state/state.js'
 import { createChatModel } from '../../../2model/model.js'
-import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../../prompts.js'
+import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../../../prompts.js'
 import { getScoreTemplatesMcp } from '../../../7mcp/index.js'
 
 // ── 输出 Schema ─────────────────────────────────────────────────────────────

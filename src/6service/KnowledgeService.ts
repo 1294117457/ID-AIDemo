@@ -1,15 +1,9 @@
 // ─── Layer 6: Knowledge Service — 知识库业务编排 ──────────────────────────────
 
-import * as rag from '../rag/index.js'
+import * as rag from '../8rag/index.js'
 import fs from 'fs'
-import type { ScoreTemplate } from '../3state/state.js'
-import type { AnalyzeCertificateResult, AnalyzeGenerateResult } from './types.js'
-
-// ── 文件处理 ─────────────────────────────────────────────────────────────────
-
-function decodeFileName(name: string): string {
-  return Buffer.from(name, 'latin1').toString('utf8')
-}
+import { decodeFileName } from '../utils.js'
+import type { ScoreTemplate, AnalyzeCertificateResult, AnalyzeGenerateResult } from '../types/shared.js'
 
 // ── 知识库公开 API ────────────────────────────────────────────────────────────
 

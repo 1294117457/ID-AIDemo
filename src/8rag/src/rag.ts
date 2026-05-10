@@ -1,4 +1,4 @@
-// ─── rag/src/rag.ts — 知识库业务编排层 ──────────────────────────────────────────
+// ─── rag/src/rag.ts — 知识库业务编排层 ─────────────────────────────────────────
 // 串联：loader（解析）→ 分块 → store（入库/检索），错误和日志统一在 agent 层处理
 import fs from 'fs'
 import path from 'path'
@@ -85,7 +85,6 @@ export async function ingestFile(buffer: Buffer, fileName: string): Promise<Inge
 
     const chunks = await splitAndTag(docs, fileName)
     await addDocuments(chunks)
-    // metadata 通过 chunks 内的 sourceFile 入库，无需额外记录
     return { chunkCount: chunks.length, textLength: fullText.length }
   } finally {
     if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath)
@@ -103,7 +102,6 @@ export async function parseFileToText(filePath: string, hintExt?: string): Promi
 
 export async function removeSource(sourceFile: string): Promise<void> {
   await deleteBySource(sourceFile)
-  // Chroma 中该 sourceFile 的所有 chunk 已通过 filter 删除，无需额外操作
 }
 
 // ── 列表 & 统计 ─────────────────────────────────────────────────────────────

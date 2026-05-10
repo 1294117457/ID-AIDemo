@@ -5,7 +5,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { interrupt } from '@langchain/langgraph'
 import { z } from 'zod'
 import { createChatModel } from '../2model/model.js'
-import { classifyPrompt, contextualAskPrompt } from './prompts.js'
+import { classifyPrompt, contextualAskPrompt } from '../prompts.js'
 import type { MainStateType } from '../3state/state.js'
 
 // ── classifyNode ──────────────────────────────────────────────────────────────

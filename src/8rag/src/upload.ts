@@ -4,9 +4,9 @@ import { UPLOAD_DIR } from './store.js'
 import fs from 'fs'
 import 'dotenv/config'
 
-// ── 配置（直接从 .env 读取）───────────────────────────────────────────────────
+// ── 配置 ────────────────────────────────────────────────────────────────────
 
-const MAX_FILE_SIZE_KB        = Number(process.env['MAX_FILE_SIZE_KB']        ?? 20480)
+const MAX_FILE_SIZE_KB         = Number(process.env['MAX_FILE_SIZE_KB']            ?? 20480)
 const KNOWLEDGE_MAX_FILE_SIZE = Number(process.env['KNOWLEDGE_MAX_FILE_SIZE_KB'] ?? 20480)
 
 console.log(`[rag/upload] MAX_FILE_SIZE_KB=${MAX_FILE_SIZE_KB}, KNOWLEDGE_MAX_FILE_SIZE_KB=${KNOWLEDGE_MAX_FILE_SIZE}`)

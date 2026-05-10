@@ -1,10 +1,9 @@
 // ─── Prompts — 所有提示词模板 ─────────────────────────────────────────────────
 // 集中管理，修改提示词只需改这一个文件
-// prompts 只被 Node 层引用，所以放在 4node/ 目录下
 
 /** classifyNode 的意图分类 prompt */
 export function classifyPrompt(allUserText: string): string {
-  return `分析以下用户的多轮输入，判断意图并提取信息。请以 JSON 格式返回结果。：
+  return `分析以下用户的多轮输入，判断意图并提取信息。请以 JSON 格式返回结果：
 
 【分类与校验规则】：
 1. 如果用户是单纯询问政策或了解相关信息（如"挑战杯能加多少分"），意图记为 consult。

@@ -4,13 +4,11 @@
 
 import { BACKEND_URL } from '../1config/config.js'
 import type {
-  ScoreTemplate,
-  UserInfo,
   McpToolResult,
   GetScoreTemplatesResponse,
   GetUserInfoResponse,
   SubmitApplicationResponse,
-} from './types.js'
+} from '../types/shared.js'
 
 // ── HTTP 基础 ───────────────────────────────────────────────────────────────
 
@@ -26,13 +24,14 @@ async function mcpFetch<T>(
 ): Promise<McpToolResult<T>> {
   const { userToken, ...fetchOptions } = options
 
+  const isMutation = !['GET', 'HEAD'].includes((fetchOptions.method ?? 'GET').toUpperCase())
+
   try {
     const resp = await fetch(`${BACKEND_URL}${path}`, {
       ...fetchOptions,
       headers: {
-        // 透传前端 JWT，后端 Security Filter 自动验证
         'Authorization': userToken,
-        'Content-Type': 'application/json',
+        ...(isMutation ? { 'Content-Type': 'application/json' } : {}),
         ...fetchOptions.headers,
       },
     })

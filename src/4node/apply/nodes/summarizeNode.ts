@@ -6,6 +6,7 @@
 
 import { AIMessage } from '@langchain/core/messages'
 import type { ApplyStateType } from '../../../3state/state.js'
+import { parseCheckResults } from '../utils.js'
 
 /**
  * 将 LLM 匹配结果汇总为用户可读的文本
@@ -20,11 +21,9 @@ export async function summarizeNode(
 ): Promise<Partial<ApplyStateType>> {
   console.log('--apply:summarize')
 
-  const suggestions = state.checkResults
-    .map(r => { try { return JSON.parse(r) } catch { return null } })
-    .filter(Boolean)
+  const suggestions = parseCheckResults(state.checkResults)
 
-  if (suggestions.length === 0 || (suggestions[0] as any)?.error) {
+  if (suggestions.length === 0) {
     return { messages: [new AIMessage(
       '根据您提供的材料，暂未匹配到符合条件的加分项。请确认材料内容是否完整，或补充更多信息。'
     )] }

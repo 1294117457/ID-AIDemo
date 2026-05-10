@@ -16,6 +16,7 @@ import {
   getConversationCount,
   clearMessages,
 } from '../../6service/ConversationService.js'
+import { ok, fail } from '../types.js'
 
 const router = Router()
 
@@ -72,7 +73,7 @@ router.post('/create', (req, res) => {
 
   try {
     const result = createConversation(userId, firstMessage)
-    res.json({ code: 200, msg: '成功', data: result })
+    res.json(ok(result))
   } catch (e: any) {
     res.status(500).json({ code: 500, msg: String(e), data: null })
   }
@@ -82,13 +83,12 @@ router.post('/create', (req, res) => {
 router.get('/:sessionId', (req, res) => {
   const conv = getConversationBySession(req.params['sessionId'])
   if (!conv) { res.status(404).json({ code: 404, msg: '会话不存在', data: null }); return }
-  res.json({ code: 200, msg: '成功', data: conv })
+  res.json(ok(conv))
 })
 
 // GET /ai/conversation/:sessionId/messages
 router.get('/:sessionId/messages', (req, res) => {
-  const msgs = getMessages(req.params['sessionId'])
-  res.json({ code: 200, msg: '成功', data: msgs })
+  res.json(ok(getMessages(req.params['sessionId'])))
 })
 
 // PUT /ai/conversation/:sessionId/title
@@ -99,7 +99,7 @@ router.put('/:sessionId/title', (req, res) => {
 
   try {
     updateConversationTitle(req.params['sessionId'], title)
-    res.json({ code: 200, msg: '成功', data: null })
+    res.json(ok(null))
   } catch (e: any) {
     res.status(500).json({ code: 500, msg: String(e), data: null })
   }
@@ -109,7 +109,7 @@ router.put('/:sessionId/title', (req, res) => {
 router.post('/:sessionId/archive', (req, res) => {
   try {
     archiveConversation(req.params['sessionId'])
-    res.json({ code: 200, msg: '成功', data: null })
+    res.json(ok(null))
   } catch (e: any) {
     res.status(500).json({ code: 500, msg: String(e), data: null })
   }
@@ -119,7 +119,7 @@ router.post('/:sessionId/archive', (req, res) => {
 router.delete('/:sessionId', (req, res) => {
   try {
     deleteConversation(req.params['sessionId'])
-    res.json({ code: 200, msg: '成功', data: null })
+    res.json(ok(null))
   } catch (e: any) {
     res.status(500).json({ code: 500, msg: String(e), data: null })
   }
@@ -129,7 +129,7 @@ router.delete('/:sessionId', (req, res) => {
 router.delete('/:sessionId/messages', (req, res) => {
   try {
     clearMessages(req.params['sessionId'])
-    res.json({ code: 200, msg: '成功', data: null })
+    res.json(ok(null))
   } catch (e: any) {
     res.status(500).json({ code: 500, msg: String(e), data: null })
   }

@@ -8,18 +8,18 @@ import type { Document } from '@langchain/core/documents'
 import path from 'path'
 import 'dotenv/config'
 
-// ── 配置（直接从 .env 读取）───────────────────────────────────────────────────
+// ── 配置 ────────────────────────────────────────────────────────────────────
 
 const CHUNK_SIZE    = Number(process.env['CHUNK_SIZE']    ?? 500)
 const CHUNK_OVERLAP = Number(process.env['CHUNK_OVERLAP'] ?? 100)
 
 const splitter = new RecursiveCharacterTextSplitter({ chunkSize: CHUNK_SIZE, chunkOverlap: CHUNK_OVERLAP })
 
-// ── 支持的格式（内联，不单独文件）─────────────────────────────────────────────
+// ── 支持的格式 ────────────────────────────────────────────────────────────────
 
 const SUPPORTED_EXTS = new Set(['.pdf', '.docx', '.csv', '.xlsx', '.xls', '.md', '.txt'])
 
-// ── Excel 解析 ───────────────────────────────────────────────────────────────
+// ── Excel 解析 ────────────────────────────────────────────────────────────────
 
 async function parseXlsx(filePath: string): Promise<string> {
   const XLSX = await import('xlsx')

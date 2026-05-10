@@ -17,7 +17,8 @@ const COLLECTION_NAME = 'knowledge_base'
 // ── 路径 ────────────────────────────────────────────────────────────────────
 
 const __dirname = fileURLToPath(import.meta.url)
-const RAG_ROOT  = path.resolve(__dirname, '../..')
+// 8rag/src/store.ts → 8rag/ → src/ → 项目根
+const RAG_ROOT  = path.resolve(__dirname, '../../../..')
 
 export const RAG_DATA_DIR  = path.resolve(RAG_ROOT, 'data')
 export const UPLOAD_DIR    = path.resolve(RAG_ROOT, 'data/uploads')
@@ -45,11 +46,7 @@ async function loadClient(): Promise<Chroma> {
 }
 
 // ── 向量操作（统一重试封装） ──────────────────────────────────────────────────
-/**
- * 
- *  Chroma 客户端封装
- * 
- */
+
 async function getClientWithRetry<T>(fn: (client: Chroma) => Promise<T>): Promise<T> {
   try {
     const client = await loadClient()
@@ -80,15 +77,12 @@ export async function similaritySearch(query: string, topK: number): Promise<Doc
   })
 }
 
-// deleteBySource — 使用 LangChain 公开 API: client.delete({ filter })
-// filter 类型使用 chromadb 原生 Where 类型
 export async function deleteBySource(sourceFile: string): Promise<void> {
   await getClientWithRetry(async (client) => {
     await client.delete({ filter: { sourceFile } as unknown as Where })
   })
 }
 
-// resetStore — 直接使用原生 collection 的 deleteAll（deleteAll 不在 LangChain 封装中）
 export async function resetStore(): Promise<void> {
   await getClientWithRetry(async (client) => {
     const collection = await client.ensureCollection()
@@ -99,7 +93,6 @@ export async function resetStore(): Promise<void> {
   })
 }
 
-// getAllDocuments — 使用原生 collection 分页读取（offset 为 Chroma v2 特性）
 export async function getAllDocuments(): Promise<Document[]> {
   return getClientWithRetry(async (client) => {
     const collection = await client.ensureCollection()
@@ -141,10 +134,6 @@ export async function getAllDocuments(): Promise<Document[]> {
   })
 }
 
-// ── FileMeta 管理（从 Chroma 实时聚合，不再依赖 meta.json） ───────────────────────
-
-// listFileMeta — 使用原生 collection 分页读取（offset 为 Chroma v2 特性）
-// 不再依赖 meta.json，每次从 Chroma 实时聚合
 export async function listFileMeta(): Promise<FileMeta[]> {
   return getClientWithRetry(async (client) => {
     const collection = await client.ensureCollection()

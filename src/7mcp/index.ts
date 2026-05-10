@@ -3,11 +3,8 @@
 
 export { getScoreTemplatesMcp, getUserInfoMcp, submitApplicationMcp } from './mcpClient.js'
 export type {
-  ScoreTemplate,
-  TemplateRule,
-  UserInfo,
   McpToolResult,
   GetScoreTemplatesResponse,
   GetUserInfoResponse,
   SubmitApplicationResponse,
-} from './types.js'
+} from '../types/shared.js'

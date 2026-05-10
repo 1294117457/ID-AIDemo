@@ -4,7 +4,7 @@
 // 输出：state.policyContext（RAG 检索结果）
 
 import type { ApplyStateType } from '../../../3state/state.js'
-import { searchKnowledge } from '../../../rag/index.js'
+import { searchKnowledge } from '../../../8rag/index.js'
 
 export async function fetchPolicyNode(
   state: ApplyStateType

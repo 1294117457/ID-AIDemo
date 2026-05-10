@@ -2,12 +2,12 @@
 import express, { Router } from 'express'
 import cors from 'cors'
 import { initDb } from '../1config/config.js'
-import { initKnowledge } from '../rag/index.js'
-import agentRouter     from './agent/index.js'
-import analyzeRouter   from './analyze/index.js'
-import configRouter    from './config/index.js'
-import knowledgeRouter  from './knowledge/index.js'
-import conversationRouter from './conversation/index.js'
+import { initKnowledge } from '../8rag/index.js'
+import agentRouter        from './agent/index.js'
+import analyzeRouter      from './analyze/index.js'
+import configRouter       from './config/index.js'
+import knowledgeRouter    from './knowledge/index.js'
+import conversationRouter  from './conversation/index.js'
 import { healthRouter } from './health.js'
 
 export function createApp() {
@@ -24,7 +24,7 @@ export function createApp() {
   api.use('/conversation', conversationRouter)
   api.use('/analyze',      analyzeRouter)
   api.use('/config',       configRouter)
-  api.use('/knowledge',     knowledgeRouter)
+  api.use('/knowledge',    knowledgeRouter)
   app.use('/ai', api)
 
   // 初始化（启动时一次性执行）

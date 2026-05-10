@@ -1,10 +1,10 @@
 // ─── Controller: 证明材料分析 ─────────────────────────────────────────────────
 import { Router } from 'express'
-import { upload } from '../../rag/index.js'
+import { upload } from '../../8rag/index.js'
 import { analyzeCertificate, generateRemark } from '../../6service/KnowledgeService.js'
 import { ok, fail } from '../types.js'
 import type { AnalyzeGenerateBody } from '../types.js'
-import type { ScoreTemplate } from '../../3state/state.js'
+import type { ScoreTemplate } from '../../types/shared.js'
 
 const router = Router()
 

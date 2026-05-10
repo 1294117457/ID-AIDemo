@@ -1,6 +1,6 @@
 // ─── Controller: Agent 对话 ────────────────────────────────────────────────────
 import { Router } from 'express'
-import { upload } from '../../rag/index.js'
+import { upload } from '../../8rag/index.js'
 import { parseAgentParams, invokeAgent, resumeAgent, streamAgent, streamResume } from '../../6service/AgentService.js'
 import type { AgentResumeBody } from '../types.js'
 
@@ -42,7 +42,6 @@ router.post('/resume-stream', async (req, res) => {
   const body = req.body as AgentResumeBody
   if (!body.sessionId || !body.supplement?.trim()) { res.status(400).json({ code: 400, msg: '缺少 sessionId 或 supplement', data: null }); return }
   const userId = (req.headers['x-user-id'] as string) || undefined
-  // Authorization 由后端透传，Agent 用它调用 MCP 接口
   const authHeader = (req.headers['authorization'] as string) || ''
   const userToken = authHeader.startsWith('Bearer ')
     ? authHeader.slice(7)

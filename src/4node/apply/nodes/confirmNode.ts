@@ -6,6 +6,7 @@
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { interrupt } from '@langchain/langgraph'
 import type { ApplyStateType } from '../../../3state/state.js'
+import { parseCheckResults } from '../utils.js'
 
 // ── Router ───────────────────────────────────────────────────────────────
 
@@ -13,9 +14,7 @@ import type { ApplyStateType } from '../../../3state/state.js'
  * 路由判断：有匹配结果 → 进入 confirm 等待用户确认；无结果 → 直接结束
  */
 export function confirmRoute(state: ApplyStateType): 'confirm' | 'end' {
-  const suggestions = state.checkResults
-    .map(r => { try { return JSON.parse(r) } catch { return null } })
-    .filter((s: any) => s && !s.error)
+  const suggestions = parseCheckResults(state.checkResults)
   return suggestions.length > 0 ? 'confirm' : 'end'
 }
 
@@ -33,9 +32,7 @@ export async function confirmNode(
 ): Promise<Partial<ApplyStateType>> {
   console.log('--apply:confirm (interrupt)')
 
-  const suggestions = state.checkResults
-    .map(r => { try { return JSON.parse(r) } catch { return null } })
-    .filter((s: any) => s && !s.error)
+  const suggestions = parseCheckResults(state.checkResults)
 
   const question = [
     `已为您匹配到以下加分项，请上传对应证明材料后点击「确认提交」：`,

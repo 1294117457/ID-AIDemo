@@ -10,6 +10,7 @@
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { ApplyStateType } from '../../../3state/state.js'
 import { getUserInfoMcp, submitApplicationMcp } from '../../../7mcp/index.js'
+import { parseCheckResults } from '../utils.js'
 
 // ── 节点实现 ───────────────────────────────────────────────────────────────
 
@@ -64,9 +65,8 @@ export async function submitNode(
   const userInfo = infoResult.data.userInfo
 
   // ── Step 3：构造 submitBody ───────────────────────────────────────
-  const suggestion = state.checkResults
-    .map(r => { try { return JSON.parse(r) } catch { return null } })
-    .filter((s: any) => s && !s.error)[0] as any
+  const suggestions = parseCheckResults(state.checkResults)
+  const suggestion = suggestions[0]
 
   if (!suggestion) {
     return { messages: [new AIMessage('申请数据异常，请重新上传证明材料。')] }

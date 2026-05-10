@@ -1,14 +1,10 @@
 // ─── Layer 7: Controller — 统一响应与请求类型 ────────────────────────────────
 
-import type { ScoreTemplate } from '../3state/state.js'
+import type { ScoreTemplate, ApiResponse } from '../types/shared.js'
 
-// ── 统一响应结构 ──────────────────────────────────────────────────────────────
+// ── 统一响应结构（重导出，方便 controller 直接使用）──────────────────────────
 
-export interface ApiResponse<T = unknown> {
-  code: number
-  msg: string
-  data: T | null
-}
+export type { ApiResponse }
 
 export function ok<T>(data: T): ApiResponse<T> {
   return { code: 200, msg: '成功', data }

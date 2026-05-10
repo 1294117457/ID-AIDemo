@@ -3,8 +3,8 @@
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { createChatModel } from '../2model/model.js'
-import { searchKnowledge } from '../rag/index.js'
-import { consultSystemPrompt } from './prompts.js'
+import { searchKnowledge } from '../8rag/index.js'
+import { consultSystemPrompt } from '../prompts.js'
 import { getSystemRole } from '../1config/config.js'
 import type { ConsultStateType } from '../3state/state.js'
 
@@ -20,8 +20,6 @@ export async function retrieveNode(state: ConsultStateType): Promise<Partial<Con
 
 /**
  * 回答节点：基于检索结果生成回答
- *
- * ⚠️ answerDraft 已删除（从未被读取，冗余字段）
  */
 export async function answerNode(state: ConsultStateType): Promise<Partial<ConsultStateType>> {
   console.log('--consult:answer')
