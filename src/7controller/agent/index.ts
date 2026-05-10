@@ -42,9 +42,14 @@ router.post('/resume-stream', async (req, res) => {
   const body = req.body as AgentResumeBody
   if (!body.sessionId || !body.supplement?.trim()) { res.status(400).json({ code: 400, msg: '缺少 sessionId 或 supplement', data: null }); return }
   const userId = (req.headers['x-user-id'] as string) || undefined
+  // Authorization 由后端透传，Agent 用它调用 MCP 接口
+  const authHeader = (req.headers['authorization'] as string) || ''
+  const userToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : authHeader
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' })
   try {
-    for await (const event of streamResume(body.sessionId, body.supplement.trim(), userId)) {
+    for await (const event of streamResume(body.sessionId, body.supplement.trim(), userId, userToken)) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
   } catch (e) { res.write(`data: ${JSON.stringify({ type: 'error', data: { message: String(e) } })}\n\n`) }

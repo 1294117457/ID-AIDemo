@@ -8,6 +8,9 @@ import { consultSystemPrompt } from './prompts.js'
 import { getSystemRole } from '../1config/config.js'
 import type { ConsultStateType } from '../3state/state.js'
 
+/**
+ * 检索节点：RAG 向量库检索
+ */
 export async function retrieveNode(state: ConsultStateType): Promise<Partial<ConsultStateType>> {
   console.log('--consult:retrieve')
   const userMsg = state.messages.filter(m => m instanceof HumanMessage).at(-1)!
@@ -15,6 +18,11 @@ export async function retrieveNode(state: ConsultStateType): Promise<Partial<Con
   return { retrievedContext }
 }
 
+/**
+ * 回答节点：基于检索结果生成回答
+ *
+ * ⚠️ answerDraft 已删除（从未被读取，冗余字段）
+ */
 export async function answerNode(state: ConsultStateType): Promise<Partial<ConsultStateType>> {
   console.log('--consult:answer')
   const userMsg = state.messages.filter(m => m instanceof HumanMessage).at(-1)!
@@ -23,5 +31,5 @@ export async function answerNode(state: ConsultStateType): Promise<Partial<Consu
     new SystemMessage(consultSystemPrompt(getSystemRole(), state.retrievedContext)),
     new HumanMessage(String(userMsg.content)),
   ])
-  return { answerDraft: String(reply.content), messages: [reply] }
+  return { messages: [reply] }
 }

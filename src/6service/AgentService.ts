@@ -9,7 +9,7 @@ import { parseFileToText } from '../rag/index.js'
 import { appendMessage, getConversationBySession } from './ConversationService.js'
 import fs from 'fs'
 import type { AgentInput, AgentResult } from './types.js'
-import type { ScoreTemplate, UserInfo } from '../3state/state.js'
+import type { ScoreTemplate } from '../3state/state.js'
 import type { Request } from 'express'
 
 let _app: any = null
@@ -80,7 +80,13 @@ async function compressIfNeeded(
 // ── 公开 API ─────────────────────────────────────────────────────────────────
 
 export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
-  const config = { configurable: { thread_id: input.sessionId } }
+  const config = {
+    configurable: {
+      thread_id: input.sessionId,
+      userToken: input.userToken,  // 前端 JWT，透传给 MCP 工具调用
+      userId:    input.userId,
+    }
+  }
   const app = await getApp()
   if (input.userId) {
     safeAppendMessage(input.sessionId, input.userId, 'user', input.userInput)
@@ -89,9 +95,9 @@ export async function invokeAgent(input: AgentInput): Promise<AgentResult> {
   const result = await app.invoke({
     messages:     [new HumanMessage(input.userInput)],
     documentText: input.documentText ?? '',
-    templates:    input.templates ?? [],
-    userInfo:     input.userInfo ?? null,
+    templates:    input.templates ?? [],   // 保留（analyzeMatchNode 也可能用到）
     forcedIntent: input.forcedIntent ?? null,
+    // userInfo 不再传入，submitNode 通过 MCP 按需拉取
   }, config)
   const interruptResult = await checkInterrupt(config)
   if (interruptResult) {
@@ -120,10 +126,17 @@ export async function resumeAgent(sessionId: string, supplement: string): Promis
   return extractResult(result)
 }
 
-const SKIP_NODES = new Set(['classify', 'analyzeAndMatch', 'ask', 'summarize'])
+// 跳过不在前端展示的节点（RAG 检索 / 意图分类 / 中间汇总，这些节点的 token 通过子图聚合输出）
+const SKIP_NODES = new Set(['classify', 'ask', 'retrieve', 'fetchPolicy', 'analyzeAndMatch', 'summarize'])
 
 export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: string; data: any }> {
-  const config = { configurable: { thread_id: input.sessionId } }
+  const config = {
+    configurable: {
+      thread_id: input.sessionId,
+      userToken: input.userToken,  // 前端 JWT，透传给 MCP 工具调用
+      userId:    input.userId,
+    }
+  }
   const app = await getApp()
 
   // 追加用户消息到 SQLite
@@ -139,7 +152,8 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
   // 累积 AI 回复，写入 SQLite
   let assistantContent = ''
   const eventStream = app.streamEvents(
-    { messages: [new HumanMessage(input.userInput)], documentText: input.documentText ?? '', templates: input.templates ?? [], userInfo: input.userInfo ?? null, forcedIntent: input.forcedIntent ?? null },
+    { messages: [new HumanMessage(input.userInput)], documentText: input.documentText ?? '',
+      templates: input.templates ?? [], forcedIntent: input.forcedIntent ?? null },
     { ...config, version: 'v2' }
   )
 
@@ -173,8 +187,14 @@ export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: st
   yield { type: 'result', data: extractResult(snapshot.values as any) }
 }
 
-export async function* streamResume(sessionId: string, supplement: string, userId?: string): AsyncGenerator<{ type: string; data: any }> {
-  const config = { configurable: { thread_id: sessionId } }
+export async function* streamResume(sessionId: string, supplement: string, userId?: string, userToken?: string): AsyncGenerator<{ type: string; data: any }> {
+  const config = {
+    configurable: {
+      thread_id: sessionId,
+      userToken: userToken ?? '',
+      userId:    userId,
+    }
+  }
   const app = await getApp()
 
   // 写入用户的补充消息到 SQLite
@@ -225,11 +245,9 @@ function decodeFileName(name: string) {
 export interface ParsedAgentParams {
   userInput:    string
   sessionId:    string
-  userId:      string | null
+  userId:       string | null
   documentText: string
-  templates:    ScoreTemplate[]
-  userInfo:    UserInfo | null
-  // 申请入口注入：强制走 applyGraph，跳过 classifyNode 的 LLM 分类
+  userToken:    string   // 前端 JWT，透传给 MCP 工具调用
   forcedIntent: 'consult' | 'apply' | null
 }
 
@@ -237,8 +255,14 @@ export async function parseAgentParams(req: Request): Promise<ParsedAgentParams>
   const body = req.body as any
   const userInput  = String(body.message ?? '').trim()
   const sessionId = body.sessionId ?? 'default'
-  // x-user-id 由 idbackend 从 JWT Token 中解析后注入
+  // x-user-id 由后端从 JWT 中解析后注入（仅用于会话归属校验）
   const userId = (req.headers['x-user-id'] as string) || null
+
+  // Authorization 由后端透传，Agent 用它调用 MCP 接口
+  const authHeader = (req.headers['authorization'] as string) || ''
+  const userToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : authHeader
 
   let documentText = ''
   if (req.file) {
@@ -248,17 +272,12 @@ export async function parseAgentParams(req: Request): Promise<ParsedAgentParams>
     fs.unlink(req.file.path, () => {})
   }
 
-  let templates: ScoreTemplate[] = []
-  let userInfo: UserInfo | null = null
-  try { if (body.templates) templates = JSON.parse(body.templates) } catch {}
-  try { if (body.userInfo) userInfo   = JSON.parse(body.userInfo) } catch {}
-
   // forcedIntent 支持：申请入口传入 intent=apply，强制跳过 LLM 分类
   const forcedIntent = (body.intent === 'apply' || body.intent === 'consult')
     ? body.intent as 'consult' | 'apply'
     : null
 
-  return { userInput, sessionId, userId, documentText, templates, userInfo, forcedIntent }
+  return { userInput, sessionId, userId, documentText, userToken, forcedIntent }
 }
 
 /**

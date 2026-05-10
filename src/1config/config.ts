@@ -11,6 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DB_PATH    = path.resolve(__dirname, '../../data/agent.db')
 export const CHECKPOINT_PATH = path.resolve(__dirname, '../../data/checkpoints.db')
 
+// ── 后端地址（供 MCP 调用使用）───────────────────────────────────────────────
+export const BACKEND_URL = process.env.JAVA_BACKEND_URL ?? 'http://localhost:8080'
+
 // ── SQLite ─────────────────────────────────────────────────────────────────────
 
 let _db: Database.Database | null = null

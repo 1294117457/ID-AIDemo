@@ -1,14 +1,14 @@
 // ─── Layer 6: Service — 共享类型 ─────────────────────────────────────────────
 
-import type { ScoreTemplate, UserInfo } from '../3state/state.js'
+import type { ScoreTemplate } from '../3state/state.js'
 
 export interface AgentInput {
   userInput:    string
   documentText?: string
-  templates?:   ScoreTemplate[]
+  templates?:   ScoreTemplate[]   // 保留（调试兼容），正式流程由 MCP 提供
   sessionId:    string
-  userInfo?:    UserInfo | null
-  userId?:      string   // 用户身份，由 idbackend 通过 x-user-id 头传递，用于会话持久化
+  userId?:      string   // 用户身份，由后端通过 x-user-id 头传递，用于会话持久化
+  userToken:    string   // 前端 JWT，透传给 MCP 工具调用
   forcedIntent?: 'consult' | 'apply' | null  // 申请入口注入，强制跳过 LLM 分类
 }
 
