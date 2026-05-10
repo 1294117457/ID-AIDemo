@@ -2,7 +2,7 @@
 
 import { MessagesAnnotation, Annotation } from '@langchain/langgraph'
 
-export const ConsultState = Annotation.Root({
+export const ConsultStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
 
   // ── 主图透传 ──────────────────────────────────────────────────
@@ -16,4 +16,4 @@ export const ConsultState = Annotation.Root({
   retrievedContext: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
 })
 
-export type ConsultStateType = typeof ConsultState.State
+export type ConsultState = typeof ConsultStateAnnotation.State

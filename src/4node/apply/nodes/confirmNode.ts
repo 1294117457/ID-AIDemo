@@ -3,13 +3,13 @@
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { interrupt } from '@langchain/langgraph'
-import type { ApplyStateType } from '../../../3state/index.js'
+import type { ApplyState } from '../../../3state/index.js'
 import { parseCheckResults } from '../utils.js'
 
 /**
  * 路由判断：有匹配结果 → 进入 confirm 等待用户确认；无结果 → 直接结束
  */
-export function confirmRoute(state: ApplyStateType): 'confirm' | 'end' {
+export function confirmRoute(state: ApplyState): 'confirm' | 'end' {
   const suggestions = parseCheckResults(state.checkResults)
   return suggestions.length > 0 ? 'confirm' : 'end'
 }
@@ -18,8 +18,8 @@ export function confirmRoute(state: ApplyStateType): 'confirm' | 'end' {
  * 等待用户确认并上传证明材料（interrupt）
  */
 export async function confirmNode(
-  state: ApplyStateType
-): Promise<Partial<ApplyStateType>> {
+  state: ApplyState
+): Promise<Partial<ApplyState>> {
   console.log('--apply:confirm (interrupt)')
 
   const suggestions = parseCheckResults(state.checkResults)

@@ -1,9 +1,10 @@
-// ─── Layer 6: Knowledge Service — 知识库业务编排 ──────────────────────────────
+// ─── Layer 5: Knowledge Service — 知识库业务编排 ──────────────────────────────
 
-import * as rag from '../8rag/index.js'
+import * as rag from '../rag/index.js'
 import fs from 'fs'
 import { decodeFileName } from '../1common/utils/index.js'
 import type { ScoreTemplate, AnalyzeCertificateResult, AnalyzeGenerateResult } from '../1common/types/shared.js'
+import { getScoreTemplatesMcp } from '../7controller/mcp/mcpClient.js'
 
 // ── 知识库公开 API ────────────────────────────────────────────────────────────
 
@@ -32,9 +33,14 @@ export async function removeKnowledgeSource(sourceFile: string) {
 
 // ── 证明材料分析公开 API ───────────────────────────────────────────────────────
 
+/**
+ * 分析用户上传的证明材料
+ * templates 为空时自动从后端 MCP 拉取
+ */
 export async function analyzeCertificate(
   file: Express.Multer.File,
-  templates: ScoreTemplate[]
+  templates: ScoreTemplate[],
+  userToken?: string
 ): Promise<AnalyzeCertificateResult> {
   const fileName = decodeFileName(file.originalname)
   const hintExt  = (fileName.includes('.') ? fileName.split('.').pop() : 'pdf') ?? 'pdf'
@@ -43,7 +49,15 @@ export async function analyzeCertificate(
 
   if (!certText.trim()) throw new Error('PDF 内容为空')
 
-  return analyzeCertificateText(certText, templates)
+  let effectiveTemplates = templates
+  if (effectiveTemplates.length === 0 && userToken) {
+    const result = await getScoreTemplatesMcp(userToken)
+    if (result.success && result.data?.templates) {
+      effectiveTemplates.push(...result.data.templates)
+    }
+  }
+
+  return analyzeCertificateText(certText, effectiveTemplates)
 }
 
 export async function analyzeCertificateText(

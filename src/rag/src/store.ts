@@ -1,4 +1,5 @@
 // ─── rag/src/store.ts — Chroma 单一数据源（LangChain 公开 API） ─────────────────
+
 import { Chroma } from '@langchain/community/vectorstores/chroma'
 import type { Where } from 'chromadb'
 import { Document } from '@langchain/core/documents'
@@ -17,12 +18,12 @@ const COLLECTION_NAME = 'knowledge_base'
 // ── 路径 ────────────────────────────────────────────────────────────────────
 
 const __dirname = fileURLToPath(import.meta.url)
-// 8rag/src/store.ts → 8rag/ → src/ → 项目根
+// 6rag/src/store.ts → 6rag/ → src/ → 项目根
 const RAG_ROOT  = path.resolve(__dirname, '../../../..')
 
-export const RAG_DATA_DIR  = path.resolve(RAG_ROOT, 'data')
-export const UPLOAD_DIR    = path.resolve(RAG_ROOT, 'data/uploads')
-export const KNOWLEDGE_DIR = path.resolve(RAG_ROOT, 'data/init_docs')
+export const RAG_DATA_DIR   = path.resolve(RAG_ROOT, 'data')
+export const UPLOAD_DIR     = path.resolve(RAG_ROOT, 'data/uploads')
+export const KNOWLEDGE_DIR  = path.resolve(RAG_ROOT, 'data/init_docs')
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ interface FileMeta {
   textLength: number
 }
 
-// ── Chroma 单例（懒加载 + 失败重试） ───────────────────────────────────────────
+// ── Chroma 单例（懒加载 + 失败重试） ────────────────────────────────────────────
 
 let _client: Chroma | null = null
 

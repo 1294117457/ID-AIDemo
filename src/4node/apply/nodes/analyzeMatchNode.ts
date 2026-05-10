@@ -3,10 +3,10 @@
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import type { ApplyStateType } from '../../../3state/index.js'
+import type { ApplyState } from '../../../3state/index.js'
 import { createChatModel } from '../../../2model/model.js'
 import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../../../1common/prompts.js'
-import { getScoreTemplatesMcp } from '../../../7mcp/index.js'
+import { getScoreTemplatesMcp } from '../../../7controller/mcp/index.js'
 
 const SuggestionSchema = z.object({
   suggestions: z.array(z.object({
@@ -20,9 +20,9 @@ const SuggestionSchema = z.object({
 })
 
 export async function analyzeMatchNode(
-  state: ApplyStateType,
+  state: ApplyState,
   config: { configurable: { userToken?: string } }
-): Promise<Partial<ApplyStateType>> {
+): Promise<Partial<ApplyState>> {
   console.log('--apply:analyzeMatch')
 
   const userToken = config?.configurable?.userToken ?? ''

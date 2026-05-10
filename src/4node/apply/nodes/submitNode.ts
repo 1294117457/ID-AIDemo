@@ -2,14 +2,14 @@
 // 归属：apply 子图
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
-import type { ApplyStateType } from '../../../3state/index.js'
-import { getUserInfoMcp, submitApplicationMcp } from '../../../7mcp/index.js'
+import type { ApplyState } from '../../../3state/index.js'
+import { getUserInfoMcp, submitApplicationMcp } from '../../../7controller/mcp/index.js'
 import { parseCheckResults } from '../utils.js'
 
 export async function submitNode(
-  state: ApplyStateType,
+  state: ApplyState,
   config: { configurable: { userToken?: string; userId?: string } }
-): Promise<Partial<ApplyStateType>> {
+): Promise<Partial<ApplyState>> {
   console.log('--apply:submit')
 
   const lastHuman = state.messages.filter(m => m instanceof HumanMessage).at(-1)

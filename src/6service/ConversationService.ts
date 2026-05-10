@@ -2,7 +2,7 @@
 // 所有会话数据（消息 + 元数据 + LangGraph Checkpoint）聚合到 idagent 的 SQLite
 // idbackend 只做透明代理，通过 x-user-id 请求头传递用户身份
 
-import { getDb } from '../1config/config.js'
+import { getDb } from '../1common/config.js'
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 // ─── Controller: 知识库管理 ────────────────────────────────────────────────────
 import { Router } from 'express'
-import { knowledgeUpload } from '../../8rag/index.js'
+import { knowledgeUpload } from '../../rag/index.js'
 import { ingestUpload, removeKnowledgeSource, listSources, getStats } from '../../6service/KnowledgeService.js'
 import { ok, fail } from '../types.js'
 

@@ -3,7 +3,7 @@
 
 import { MessagesAnnotation, Annotation } from '@langchain/langgraph'
 
-export const MainState = Annotation.Root({
+export const MainStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
 
   // 流程控制（替换）
@@ -27,4 +27,4 @@ export const MainState = Annotation.Root({
   documentText: Annotation<string>({ reducer: (_, x) => x, default: () => '' }),
 })
 
-export type MainStateType = typeof MainState.State
+export type MainState = typeof MainStateAnnotation.State

@@ -1,8 +1,8 @@
 // ─── Layer Controller: 路由聚合 + 中间件配置 ───────────────────────────────────
 import express, { Router } from 'express'
 import cors from 'cors'
-import { initDb } from '../1config/config.js'
-import { initKnowledge } from '../8rag/index.js'
+import { initDb } from '../1common/config.js'
+import { initKnowledge } from '../rag/index.js'
 import agentRouter        from './agent/index.js'
 import analyzeRouter      from './analyze/index.js'
 import configRouter       from './config/index.js'

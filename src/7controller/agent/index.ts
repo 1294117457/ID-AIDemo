@@ -1,7 +1,8 @@
 // ─── Controller: Agent 对话 ────────────────────────────────────────────────────
 import { Router } from 'express'
-import { upload } from '../../8rag/index.js'
+import { upload } from '../../rag/index.js'
 import { parseAgentParams, invokeAgent, resumeAgent, streamAgent, streamResume } from '../../6service/AgentService.js'
+import { extractAuth } from '../../6service/utils/auth.js'
 import type { AgentResumeBody } from '../types.js'
 
 const router = Router()
@@ -41,14 +42,10 @@ router.post('/resume', async (req, res) => {
 router.post('/resume-stream', async (req, res) => {
   const body = req.body as AgentResumeBody
   if (!body.sessionId || !body.supplement?.trim()) { res.status(400).json({ code: 400, msg: '缺少 sessionId 或 supplement', data: null }); return }
-  const userId = (req.headers['x-user-id'] as string) || undefined
-  const authHeader = (req.headers['authorization'] as string) || ''
-  const userToken = authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : authHeader
+  const { userId, userToken } = extractAuth(req)
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' })
   try {
-    for await (const event of streamResume(body.sessionId, body.supplement.trim(), userId, userToken)) {
+    for await (const event of streamResume(body.sessionId, body.supplement.trim(), userId ?? undefined, userToken)) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
   } catch (e) { res.write(`data: ${JSON.stringify({ type: 'error', data: { message: String(e) } })}\n\n`) }

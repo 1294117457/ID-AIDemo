@@ -1,4 +1,4 @@
-// ─── Layer 6: 对话记忆压缩 ─────────────────────────────────────────────────
+// ─── Layer 5: 对话记忆压缩 ─────────────────────────────────────────────────
 // 解决多轮对话中 messages 无限膨胀的问题
 
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'

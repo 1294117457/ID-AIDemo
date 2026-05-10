@@ -2,12 +2,12 @@
 // 归属：apply 子图
 
 import { AIMessage } from '@langchain/core/messages'
-import type { ApplyStateType } from '../../../3state/index.js'
+import type { ApplyState } from '../../../3state/index.js'
 import { parseCheckResults } from '../utils.js'
 
 export async function summarizeNode(
-  state: ApplyStateType
-): Promise<Partial<ApplyStateType>> {
+  state: ApplyState
+): Promise<Partial<ApplyState>> {
   console.log('--apply:summarize')
 
   const suggestions = parseCheckResults(state.checkResults)

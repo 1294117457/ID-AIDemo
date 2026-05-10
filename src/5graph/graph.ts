@@ -1,10 +1,10 @@
-// ─── Layer 5: Graph — 图编排 ───────────────────────────────────────────────────
+// ─── Layer 4: Graph — 图编排 ───────────────────────────────────────────────────
 // 组装所有节点为 LangGraph 图。每层只负责编排，不写业务逻辑。
 
 import { StateGraph, START, END } from '@langchain/langgraph'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
-import { MainState, ApplyState, ConsultState } from '../3state/index.js'
-import { CHECKPOINT_PATH } from '../1config/config.js'
+import { MainStateAnnotation, ApplyStateAnnotation, ConsultStateAnnotation } from '../3state/index.js'
+import { CHECKPOINT_PATH } from '../1common/config.js'
 
 // 主图节点
 import { classifyNode, askForMoreNode } from '../4node/classify/index.js'
@@ -28,7 +28,7 @@ export async function getCompiledGraph() {
   let _compiled: any = null
   if (!_compiled) {
     // ── 咨询子图 ─────────────────────────────────────────
-    const consultSubgraph = new StateGraph(ConsultState)
+    const consultSubgraph = new StateGraph(ConsultStateAnnotation)
       .addNode('retrieve', retrieveNode)
       .addNode('answer',   answerNode)
       .addEdge(START, 'retrieve')
@@ -37,7 +37,7 @@ export async function getCompiledGraph() {
       .compile()
 
     // ── 申请子图 ─────────────────────────────────────────
-    const applySubgraph = new StateGraph(ApplyState)
+    const applySubgraph = new StateGraph(ApplyStateAnnotation)
       .addNode('fetchPolicy',     fetchPolicyNode)
       .addNode('analyzeAndMatch', (state, config: any) => analyzeMatchNode(state, config))
       .addNode('summarize',       summarizeNode)
@@ -53,7 +53,7 @@ export async function getCompiledGraph() {
 
     // ── 主图 ─────────────────────────────────────────────
     const checkpointer = SqliteSaver.fromConnString(CHECKPOINT_PATH)
-    const mainGraph = new StateGraph(MainState)
+    const mainGraph = new StateGraph(MainStateAnnotation)
       .addNode('classify',     classifyNode)
       .addNode('ask',          askForMoreNode)
       .addNode('applyGraph',   applySubgraph)

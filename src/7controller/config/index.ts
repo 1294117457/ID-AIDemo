@@ -1,6 +1,6 @@
 // ─── Controller: AI 配置管理 ──────────────────────────────────────────────────
 import { Router } from 'express'
-import { getConfigView, updateConfig } from '../../1config/config.js'
+import { getConfigView, updateConfig } from '../../1common/config.js'
 import { ok, fail } from '../types.js'
 
 const router = Router()

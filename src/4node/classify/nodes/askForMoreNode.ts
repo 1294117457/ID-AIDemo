@@ -5,9 +5,9 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { interrupt } from '@langchain/langgraph'
 import { createChatModel } from '../../../2model/model.js'
 import { contextualAskPrompt } from '../../../1common/prompts.js'
-import type { MainStateType } from '../../../3state/index.js'
+import type { MainState } from '../../../3state/index.js'
 
-export async function askForMoreNode(state: MainStateType): Promise<Partial<MainStateType>> {
+export async function askForMoreNode(state: MainState): Promise<Partial<MainState>> {
   const allUserText = state.messages
     .filter(m => m instanceof HumanMessage)
     .map(m => String(m.content))

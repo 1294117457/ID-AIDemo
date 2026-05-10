@@ -4,7 +4,7 @@
 import { MessagesAnnotation, Annotation } from '@langchain/langgraph'
 import type { ScoreTemplate } from '../../1common/types/shared.js'
 
-export const ApplyState = Annotation.Root({
+export const ApplyStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec,
 
   // ── 主图透传 ──────────────────────────────────────────────────
@@ -24,4 +24,4 @@ export const ApplyState = Annotation.Root({
   checkResults: Annotation<string[]>({ reducer: (_, x) => x, default: () => [] as string[] }),
 })
 
-export type ApplyStateType = typeof ApplyState.State
+export type ApplyState = typeof ApplyStateAnnotation.State

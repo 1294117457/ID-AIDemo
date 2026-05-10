@@ -5,7 +5,7 @@ import { HumanMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { createChatModel } from '../../../2model/model.js'
 import { classifyPrompt } from '../../../1common/prompts.js'
-import type { MainStateType } from '../../../3state/index.js'
+import type { MainState } from '../../../3state/index.js'
 
 const ClassifySchema = z.object({
   intent: z.enum(['consult', 'apply', 'insufficient'])
@@ -16,7 +16,7 @@ const ClassifySchema = z.object({
                 .describe('只有在 intent 为 apply 时，提取用户用来申请的完整材料原文'),
 })
 
-export async function classifyNode(state: MainStateType): Promise<Partial<MainStateType>> {
+export async function classifyNode(state: MainState): Promise<Partial<MainState>> {
   // 申请入口优先：forcedIntent 直接指定 intent，跳过 LLM 分类
   if (state.forcedIntent) {
     console.log(`-main:classifyNode: forcedIntent=${state.forcedIntent}，跳过 LLM 分类`)

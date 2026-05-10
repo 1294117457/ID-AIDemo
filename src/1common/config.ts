@@ -1,4 +1,5 @@
 // ─── Layer 1: Config — 环境配置 + 数据库初始化 ───────────────────────────────
+// 属于 1common/ 公共基础设施层的一部分
 // 所有外部依赖（API Key、URL、DB）集中在此管理，其他层通过函数获取，不直接读 process.env
 
 import 'dotenv/config'

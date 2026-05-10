@@ -12,17 +12,14 @@ import {
   getConversationCount,
   clearMessages,
 } from '../../6service/ConversationService.js'
+import { extractAuth } from '../../6service/utils/auth.js'
 import { ok, fail } from '../types.js'
 
 const router = Router()
 
-function getUserId(req: import('express').Request): string | null {
-  return (req.headers['x-user-id'] as string) || null
-}
-
 // GET /ai/conversation/list?limit=50&offset=0
 router.get('/list', (req, res) => {
-  const userId = getUserId(req)
+  const { userId } = extractAuth(req)
   if (!userId) { res.status(401).json({ code: 401, msg: '未提供用户身份', data: null }); return }
   const limit = Math.min(parseInt(String(req.query['limit'] ?? '50'), 10), 100)
   const offset = Math.max(parseInt(String(req.query['offset'] ?? '0'), 10), 0)
@@ -37,7 +34,7 @@ router.get('/list', (req, res) => {
 
 // GET /ai/conversation/search?keyword=xxx
 router.get('/search', (req, res) => {
-  const userId = getUserId(req)
+  const { userId } = extractAuth(req)
   if (!userId) { res.status(401).json({ code: 401, msg: '未提供用户身份', data: null }); return }
   const keyword = String(req.query['keyword'] ?? '').trim()
   if (!keyword) { res.json({ code: 200, msg: '成功', data: [] }); return }
@@ -51,7 +48,7 @@ router.get('/search', (req, res) => {
 
 // POST /ai/conversation/create
 router.post('/create', (req, res) => {
-  const userId = getUserId(req)
+  const { userId } = extractAuth(req)
   if (!userId) { res.status(401).json({ code: 401, msg: '未提供用户身份', data: null }); return }
   const body = req.body as any
   const firstMessage = String(body?.firstMessage ?? '').trim()

@@ -1,9 +1,9 @@
-// ─── Layer 3: State — 统一导出 ───────────────────────────────────────────────
+// ─── Layer 2: State — 统一导出 ───────────────────────────────────────────────
 
-export { MainState }        from './states/MainState.js'
-export { ApplyState }       from './states/ApplyState.js'
-export { ConsultState }    from './states/ConsultState.js'
+export { MainStateAnnotation }    from './states/MainState.js'
+export { ApplyStateAnnotation }   from './states/ApplyState.js'
+export { ConsultStateAnnotation } from './states/ConsultState.js'
 
-export type { MainStateType }    from './states/MainState.js'
-export type { ApplyStateType }   from './states/ApplyState.js'
-export type { ConsultStateType } from './states/ConsultState.js'
+export type { MainState }    from './states/MainState.js'
+export type { ApplyState }   from './states/ApplyState.js'
+export type { ConsultState } from './states/ConsultState.js'

@@ -2,13 +2,13 @@
 // Agent 通过 MCP 主动调用后端获取数据和提交申请
 // 鉴权：继承前端 JWT Token，透传到后端统一验证，不直连 MySQL
 
-import { BACKEND_URL } from '../1config/config.js'
+import { BACKEND_URL } from '../../1common/config.js'
 import type {
   McpToolResult,
   GetScoreTemplatesResponse,
   GetUserInfoResponse,
   SubmitApplicationResponse,
-} from '../1common/types/shared.js'
+} from '../../1common/types/shared.js'
 
 // ── HTTP 基础 ───────────────────────────────────────────────────────────────
 
