@@ -3,13 +3,13 @@
 
 import { StateGraph, START, END } from '@langchain/langgraph'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
-import { MainState, ApplyState, ConsultState } from '../3state/state.js'
+import { MainState, ApplyState, ConsultState } from '../3state/index.js'
 import { CHECKPOINT_PATH } from '../1config/config.js'
 
 // 主图节点
-import { classifyNode, askForMoreNode } from '../4node/classifyNodes.js'
+import { classifyNode, askForMoreNode } from '../4node/classify/index.js'
 // consult 子图节点
-import { retrieveNode, answerNode } from '../4node/consultNodes.js'
+import { retrieveNode, answerNode } from '../4node/consult/index.js'
 // apply 子图节点
 import {
   fetchPolicyNode,
@@ -22,7 +22,6 @@ import {
 
 // ─────────────────────────────────────────────────────────────────
 // 懒加载编译（只在此文件被首次 import 时执行一次）
-// 所有 .compile() 调用必须在此函数内，不在模块顶层
 // ─────────────────────────────────────────────────────────────────
 
 export async function getCompiledGraph() {

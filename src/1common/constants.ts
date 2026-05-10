@@ -3,7 +3,6 @@
 
 // ── Graph 节点名称 ────────────────────────────────────────────────────────────
 // 与 graph.ts 中的节点名保持一致，修改节点名时只需改此处
-// 注意：AgentService 的 SKIP_NODES 也引用此列表
 
 export const GRAPH_NODE_NAMES = {
   // 主图节点

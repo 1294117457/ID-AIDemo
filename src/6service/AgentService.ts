@@ -4,12 +4,12 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { Command } from '@langchain/langgraph'
 import { getCompiledGraph } from '../5graph/graph.js'
 import { getContextMaxMessages } from '../1config/config.js'
-import { shouldCompress, compressMessages } from '../4node/memory.js'
+import { shouldCompress, compressMessages } from './memory.js'
 import { parseFileToText } from '../8rag/index.js'
 import { appendMessage, getConversationBySession } from './ConversationService.js'
-import { SKIP_NODES } from '../constants.js'
-import { decodeFileName } from '../utils.js'
-import type { AgentInput, AgentResult } from '../types/shared.js'
+import { SKIP_NODES } from '../1common/constants.js'
+import { decodeFileName } from '../1common/utils/index.js'
+import type { AgentInput, AgentResult } from '../1common/types/shared.js'
 import type { Request } from 'express'
 import fs from 'fs'
 
@@ -139,9 +139,6 @@ export async function resumeAgent(
   if (interruptResult) return interruptResult
   return extractResult(result)
 }
-
-// 跳过不在前端展示的节点（RAG 检索 / 意图分类 / 中间汇总，这些节点的 token 通过子图聚合输出）
-// 已集中到 constants.ts，与 graph.ts 节点名保持一致
 
 export async function* streamAgent(input: AgentInput): AsyncGenerator<{ type: string; data: any }> {
   const config = {

@@ -7,4 +7,4 @@ export type {
   GetScoreTemplatesResponse,
   GetUserInfoResponse,
   SubmitApplicationResponse,
-} from '../types/shared.js'
+} from '../1common/types/shared.js'

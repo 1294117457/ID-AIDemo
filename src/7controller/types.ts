@@ -1,8 +1,6 @@
 // ─── Layer 7: Controller — 统一响应与请求类型 ────────────────────────────────
 
-import type { ScoreTemplate, ApiResponse } from '../types/shared.js'
-
-// ── 统一响应结构（重导出，方便 controller 直接使用）──────────────────────────
+import type { ScoreTemplate, ApiResponse } from '../1common/types/shared.js'
 
 export type { ApiResponse }
 

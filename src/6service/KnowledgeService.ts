@@ -2,8 +2,8 @@
 
 import * as rag from '../8rag/index.js'
 import fs from 'fs'
-import { decodeFileName } from '../utils.js'
-import type { ScoreTemplate, AnalyzeCertificateResult, AnalyzeGenerateResult } from '../types/shared.js'
+import { decodeFileName } from '../1common/utils/index.js'
+import type { ScoreTemplate, AnalyzeCertificateResult, AnalyzeGenerateResult } from '../1common/types/shared.js'
 
 // ── 知识库公开 API ────────────────────────────────────────────────────────────
 

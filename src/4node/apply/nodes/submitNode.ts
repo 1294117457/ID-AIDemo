@@ -1,36 +1,17 @@
 // ─── submitNode — 解析确认 + MCP 拉 userInfo + 提交申请 ─────────────────────
 // 归属：apply 子图
-// 输入：state.messages（interrupt 响应）/ state.checkResults / state.templates
-// 输出：AI 消息（提交结果）
-//
-// MCP：
-//   - getUserInfoMcp(userId, userToken) — 拉取用户身份
-//   - submitApplicationMcp(submitBody, userToken) — 提交申请
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
-import type { ApplyStateType } from '../../../3state/state.js'
+import type { ApplyStateType } from '../../../3state/index.js'
 import { getUserInfoMcp, submitApplicationMcp } from '../../../7mcp/index.js'
 import { parseCheckResults } from '../utils.js'
 
-// ── 节点实现 ───────────────────────────────────────────────────────────────
-
-/**
- * 提交加分申请
- *
- * 流程：
- *   1. 解析 interrupt 响应（confirm / cancel）
- *   2. MCP 拉取用户信息（getUserInfoMcp）
- *   3. 构造 submitBody
- *   4. MCP 提交申请（submitApplicationMcp）
- *   5. 返回 AI 消息
- */
 export async function submitNode(
   state: ApplyStateType,
   config: { configurable: { userToken?: string; userId?: string } }
 ): Promise<Partial<ApplyStateType>> {
   console.log('--apply:submit')
 
-  // ── Step 1：解析 interrupt 响应 ───────────────────────────────────
   const lastHuman = state.messages.filter(m => m instanceof HumanMessage).at(-1)
   const answer = String(lastHuman?.content ?? '').trim()
 
@@ -49,7 +30,6 @@ export async function submitNode(
   const proofFileIds: number[] = parsed.proofFileIds
   const proofValues: number[]  = Array.isArray(parsed.proofValues) ? parsed.proofValues : []
 
-  // ── Step 2：MCP 拉取 userInfo ─────────────────────────────────────
   const userId    = config?.configurable?.userId
   const userToken = config?.configurable?.userToken ?? ''
 
@@ -64,7 +44,6 @@ export async function submitNode(
   }
   const userInfo = infoResult.data.userInfo
 
-  // ── Step 3：构造 submitBody ───────────────────────────────────────
   const suggestions = parseCheckResults(state.checkResults)
   const suggestion = suggestions[0]
 
@@ -91,7 +70,6 @@ export async function submitNode(
     })),
   }
 
-  // ── Step 4：MCP 提交申请 ───────────────────────────────────────────
   const submitResult = await submitApplicationMcp(submitBody, userToken)
 
   if (submitResult.success) {

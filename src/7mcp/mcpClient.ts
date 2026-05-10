@@ -8,7 +8,7 @@ import type {
   GetScoreTemplatesResponse,
   GetUserInfoResponse,
   SubmitApplicationResponse,
-} from '../types/shared.js'
+} from '../1common/types/shared.js'
 
 // ── HTTP 基础 ───────────────────────────────────────────────────────────────
 
@@ -54,10 +54,7 @@ async function mcpFetch<T>(
 
 /**
  * 获取所有激活的加分模板（含 rules）
- *
  * 被 analyzeMatchNode 调用，在 LLM 匹配前拉取模板数据
- *
- * @param userToken 前端 JWT（Authorization: Bearer xxx）
  */
 export async function getScoreTemplatesMcp(
   userToken: string
@@ -72,11 +69,7 @@ export async function getScoreTemplatesMcp(
 
 /**
  * 获取指定用户的基本信息
- *
  * 被 submitNode 调用，在提交申请前拉取用户身份
- *
- * @param userId    用户 ID
- * @param userToken 前端 JWT（Authorization: Bearer xxx）
  */
 export async function getUserInfoMcp(
   userId: number,
@@ -92,11 +85,7 @@ export async function getUserInfoMcp(
 
 /**
  * 提交加分申请到数据库
- *
  * 被 submitNode 调用，用户确认后写入申请记录
- *
- * @param submitBody 申请数据（含 templateName / applyScore / proofItems 等）
- * @param userToken  前端 JWT（Authorization: Bearer xxx）
  */
 export async function submitApplicationMcp(
   submitBody: Record<string, any>,

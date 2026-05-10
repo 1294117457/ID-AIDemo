@@ -1,21 +1,10 @@
 // ─── summarizeNode — 汇总匹配结果 ───────────────────────────────────────────
 // 归属：apply 子图
-// 输入：state.checkResults（JSON 字符串数组）
-// 输出：AI 消息（汇总文本）
-// 无外部依赖，纯粹的状态转换
 
 import { AIMessage } from '@langchain/core/messages'
-import type { ApplyStateType } from '../../../3state/state.js'
+import type { ApplyStateType } from '../../../3state/index.js'
 import { parseCheckResults } from '../utils.js'
 
-/**
- * 将 LLM 匹配结果汇总为用户可读的文本
- *
- * 流程：
- *   - 解析 checkResults 中的 JSON
- *   - 生成格式化的加分项列表
- *   - 返回 AI 消息
- */
 export async function summarizeNode(
   state: ApplyStateType
 ): Promise<Partial<ApplyStateType>> {

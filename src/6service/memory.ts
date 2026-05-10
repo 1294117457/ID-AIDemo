@@ -1,12 +1,9 @@
-// ─── Layer 4: 对话记忆压缩模块 ────────────────────────────────────────────────
+// ─── Layer 6: 对话记忆压缩 ─────────────────────────────────────────────────
 // 解决多轮对话中 messages 无限膨胀的问题
-// 策略：触发阈值时，将早期对话压缩为摘要，保留最近 N 条完整消息
 
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 import { createChatModel } from '../2model/model.js'
-import { COMPRESS_THRESHOLD, KEEP_RECENT } from '../constants.js'
-
-// ── 摘要 Prompt ─────────────────────────────────────────────────────────────
+import { COMPRESS_THRESHOLD, KEEP_RECENT } from '../1common/constants.js'
 
 const SUMMARY_PROMPT = `你是一个对话历史压缩助手。请将以下对话记录压缩为一段简洁的摘要。
 
@@ -22,9 +19,6 @@ const SUMMARY_PROMPT = `你是一个对话历史压缩助手。请将以下对�
 
 请直接输出摘要，不需要额外说明。`
 
-// ── 核心压缩函数 ─────────────────────────────────────────────────────────────
-
-/** 延迟初始化，避免在模块加载时 db 还未初始化 */
 let _summaryModel: ReturnType<typeof createChatModel> | null = null
 
 function getSummaryModel() {
@@ -32,10 +26,6 @@ function getSummaryModel() {
   return _summaryModel
 }
 
-/**
- * 执行压缩：旧消息 → 摘要，新消息 → 保留
- * 返回压缩后的消息列表（可用于更新 Checkpoint）
- */
 export async function compressMessages(
   messages: (HumanMessage | AIMessage)[]
 ): Promise<(HumanMessage | AIMessage | SystemMessage)[]> {
@@ -43,7 +33,6 @@ export async function compressMessages(
   const old    = messages.slice(0, splitAt)
   const recent = messages.slice(splitAt)
 
-  // 消息太少，不需要压缩，直接返回原列表
   if (old.length === 0) return recent
 
   const convText = old
@@ -61,7 +50,6 @@ export async function compressMessages(
 
   const parts: (HumanMessage | AIMessage | SystemMessage)[] = []
 
-  // 如果摘要有效，注入摘要 system message
   if (summary.length > 10) {
     parts.push(
       new SystemMessage(
@@ -70,15 +58,10 @@ export async function compressMessages(
     )
   }
 
-  // 附加最近保留的完整消息
   parts.push(...recent)
-
   return parts
 }
 
-/**
- * 判断当前消息数是否需要压缩
- */
 export function shouldCompress(messageCount: number): boolean {
   return messageCount >= COMPRESS_THRESHOLD
 }
