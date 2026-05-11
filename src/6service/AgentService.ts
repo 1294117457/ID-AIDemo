@@ -254,7 +254,7 @@ export async function parseAgentParams(req: Request) {
   const authReq = req as AuthenticatedRequest
   const userId = authReq.userId != null ? String(authReq.userId) : null
 
-  // userToken 透传到后端 MCP 接口
+  // userToken 透传到后端 MCP 接口（通过 X-User-Token 请求头）
   const authHeader = (req.headers['authorization'] as string) || ''
   const userToken = authHeader.startsWith('Bearer ')
     ? authHeader.slice(7)

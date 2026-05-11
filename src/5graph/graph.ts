@@ -40,10 +40,10 @@ export async function getCompiledGraph() {
     // ── 申请子图 ─────────────────────────────────────────
     const applySubgraph = new StateGraph(ApplyStateAnnotation)
       .addNode('fetchPolicy',     fetchPolicyNode)
-      .addNode('analyzeAndMatch', (state, config: any) => analyzeMatchNode(state, config))
+      .addNode('analyzeAndMatch', (state: any, config: any) => analyzeMatchNode(state, config))
       .addNode('summarize',       summarizeNode)
       .addNode('confirm',         confirmNode)
-      .addNode('submit',          (state, config: any) => submitNode(state, config))
+      .addNode('submit',          (state: any, config: any) => submitNode(state, config))
       .addEdge(START, 'fetchPolicy')
       .addEdge('fetchPolicy', 'analyzeAndMatch')
       .addEdge('analyzeAndMatch', 'summarize')
@@ -54,13 +54,14 @@ export async function getCompiledGraph() {
 
     // ── 主图 ─────────────────────────────────────────────
     const checkpointer = SqliteSaver.fromConnString(CHECKPOINT_PATH)
+
     const mainGraph = new StateGraph(MainStateAnnotation)
       .addNode('classify',     classifyNode)
       .addNode('ask',          askForMoreNode)
       .addNode('applyGraph',   applySubgraph)
       .addNode('consultGraph', consultSubgraph)
       .addEdge(START, 'classify')
-      .addConditionalEdges('classify', (s) => s.intent, {
+      .addConditionalEdges('classify', (s: any) => s.intent, {
         insufficient: 'ask',
         apply:        'applyGraph',
         consult:      'consultGraph',

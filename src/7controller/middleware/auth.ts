@@ -1,8 +1,10 @@
-// ─── Layer 7: 认证中间件 — JWT 验证 ────────────────────────────────────────────────
+// ─── Layer 7: 认证中间件 — JWT 验证 + AsyncLocalStorage 注入 ─────────────────
 // 所有需要登录才能访问的路由，都通过此中间件保护
+// 验证后存入 AsyncLocalStorage，后续整个异步调用链都能通过 getCurrentUserId() / getCurrentToken() 访问
 
 import type { Request, Response, NextFunction } from 'express'
 import { verifyJWT, JWTError } from '../../1common/utils/jwt.js'
+import { requestContext } from '../mcp/requestContext.js'
 
 // ── 扩展 Request 类型（挂载已验证的用户信息）────────────────────────────────────
 
@@ -28,6 +30,7 @@ function jsonResponse(res: Response, status: number, code: number, msg: string, 
  * - token 已过期 → 403 Token 已过期
  * - tokenType != access → 403 Token 类型错误
  * - 验证通过 → req.userId + req.username 挂载到请求对象
+ *              同时存入 AsyncLocalStorage，后续异步链可取
  */
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization']
@@ -52,11 +55,20 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   try {
     const payload = verifyJWT(token)
 
-    // 挂载到请求对象，后续 handler 直接读取
+    // 挂载到请求对象（同步链路使用）
     req.userId    = payload.userId
     req.username  = payload.sub
 
-    next()
+    // 存入 AsyncLocalStorage（整个异步调用链可访问）
+    // next() 必须在 run() 回调内调用，否则上下文传不过去
+    requestContext.run(
+      {
+        userId:    payload.userId,
+        token,
+        sessionId: req.body?.sessionId,
+      },
+      () => next()
+    )
   } catch (e: unknown) {
     if (e instanceof JWTError) {
       jsonResponse(res, e.code, e.code, e.message, null)

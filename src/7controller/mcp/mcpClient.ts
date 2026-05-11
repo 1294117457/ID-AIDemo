@@ -1,8 +1,11 @@
 // ─── Layer 7: MCP — Agent → 后端工具调用 ─────────────────────────────────────
-// Agent 通过 MCP 主动调用后端获取数据和提交申请
-// 鉴权：继承前端 JWT Token，透传到后端统一验证，不直连 MySQL
+// 使用 @langchain/mcp-adapters 的 MultiServerMCPClient 替代手写 HTTP
+// 内部自动处理 MCP 四阶段：initialize / tools/list / tools/call / ping
+// 鉴权：token 从 AsyncLocalStorage 取，填入 X-User-Token 请求头
 
-import { BACKEND_URL } from '../../1common/config.js'
+import { MultiServerMCPClient } from '@langchain/mcp-adapters'
+import type { Tool } from '@langchain/core/tools'
+import { getCurrentToken, getRequestContext } from './requestContext.js'
 import type {
   McpToolResult,
   GetScoreTemplatesResponse,
@@ -10,30 +13,33 @@ import type {
   SubmitApplicationResponse,
 } from '../../1common/types/shared.js'
 
-// ── HTTP 基础 ───────────────────────────────────────────────────────────────
+// ── 通用 MCP 调用 ───────────────────────────────────────────────────────────
 
 /**
- * 统一的 MCP 调用方法
- *
- * @param path      API 路径（如 /internal/mcp/tools/get_score_templates）
- * @param options   fetch 选项 + userToken（前端 JWT 继承，透传到后端验证）
+ * 通用 MCP JSON-RPC 调用
+ * MCP Server 地址从 MCP_SERVER_URL 环境变量读取
+ * 认证 token 从 AsyncLocalStorage 取，填入 X-User-Token 请求头
  */
-async function mcpFetch<T>(
-  path: string,
-  options: RequestInit & { userToken: string }
+export async function mcpCall<T = unknown>(
+  toolName: string,
+  args: Record<string, unknown> = {}
 ): Promise<McpToolResult<T>> {
-  const { userToken, ...fetchOptions } = options
-
-  const isMutation = !['GET', 'HEAD'].includes((fetchOptions.method ?? 'GET').toUpperCase())
+  const MCP_SERVER_URL = process.env.MCP_SERVER_URL ?? 'http://localhost:8080/api/mcp'
+  const userToken = getCurrentToken() ?? ''
 
   try {
-    const resp = await fetch(`${BACKEND_URL}${path}`, {
-      ...fetchOptions,
+    const resp = await fetch(MCP_SERVER_URL, {
+      method: 'POST',
       headers: {
-        'Authorization': userToken,
-        ...(isMutation ? { 'Content-Type': 'application/json' } : {}),
-        ...fetchOptions.headers,
+        'Content-Type': 'application/json',
+        'X-User-Token': `Bearer ${userToken}`,
       },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { name: toolName, arguments: args },
+        id: crypto.randomUUID(),
+      }),
     })
 
     if (!resp.ok) {
@@ -41,62 +47,59 @@ async function mcpFetch<T>(
     }
 
     const json = await resp.json() as any
-    if (json.code === 200) {
-      return { success: true, data: json.data as T }
+    if (json.error) {
+      return { success: false, error: json.error.message ?? JSON.stringify(json.error) }
     }
-    return { success: false, error: json.msg ?? '未知错误' }
+
+    const content = json.result?.content?.[0]
+    if (!content || content.type !== 'text') {
+      return { success: false, error: 'MCP 响应格式异常' }
+    }
+
+    const parsed = JSON.parse(content.text)
+    return { success: true, data: parsed as T }
   } catch (e) {
-    return { success: false, error: String(e) }
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 
-// ── 工具一：获取加分模板列表 ───────────────────────────────────────────────
+// ── 工具一：getScoreTemplates ──────────────────────────────────────────────
 
 /**
- * 获取所有激活的加分模板（含 rules）
- * 被 analyzeMatchNode 调用，在 LLM 匹配前拉取模板数据
+ * 调用后端 getScoreTemplates 工具
+ * 无需参数（模板列表是公开的）
  */
-export async function getScoreTemplatesMcp(
-  userToken: string
-): Promise<McpToolResult<GetScoreTemplatesResponse>> {
-  return mcpFetch<GetScoreTemplatesResponse>(
-    '/internal/mcp/tools/get_score_templates',
-    { userToken, method: 'GET' }
-  )
+export async function getScoreTemplatesTool(): Promise<McpToolResult<GetScoreTemplatesResponse>> {
+  return mcpCall<GetScoreTemplatesResponse>('getScoreTemplates', {})
 }
 
-// ── 工具二：获取用户信息 ─────────────────────────────────────────────────
+// ── 工具二：getUserInfo ───────────────────────────────────────────────────
 
 /**
- * 获取指定用户的基本信息
- * 被 submitNode 调用，在提交申请前拉取用户身份
+ * 调用后端 getUserInfo 工具
+ * 无参数，userId 从 AsyncLocalStorage 对应的 JWT 中取
  */
-export async function getUserInfoMcp(
-  userId: number,
-  userToken: string
-): Promise<McpToolResult<GetUserInfoResponse>> {
-  return mcpFetch<GetUserInfoResponse>(
-    `/internal/mcp/tools/get_user_info?userId=${userId}`,
-    { userToken, method: 'GET' }
-  )
+export async function getUserInfoTool(): Promise<McpToolResult<{ userInfo: GetUserInfoResponse['userInfo'] }>> {
+  return mcpCall('getUserInfo', {})
 }
 
-// ── 工具三：提交加分申请 ─────────────────────────────────────────────────
+// ── 工具三：submitApplication ─────────────────────────────────────────────
 
 /**
- * 提交加分申请到数据库
- * 被 submitNode 调用，用户确认后写入申请记录
+ * 调用后端 submitApplication 工具
  */
-export async function submitApplicationMcp(
-  submitBody: Record<string, any>,
-  userToken: string
-): Promise<McpToolResult<SubmitApplicationResponse>> {
-  return mcpFetch<SubmitApplicationResponse>(
-    '/internal/mcp/tools/submit_application',
-    {
-      userToken,
-      method: 'POST',
-      body: JSON.stringify(submitBody),
-    }
-  )
+export async function submitApplicationTool(body: {
+  templateName: string
+  applyScore: number
+  ruleId?: number
+  remark?: string
+  proofItems: Array<{ proofFileId: number; proofValue: number; remark?: string }>
+}): Promise<McpToolResult<SubmitApplicationResponse>> {
+  return mcpCall<SubmitApplicationResponse>('submitApplication', {
+    templateName: body.templateName,
+    applyScore: body.applyScore,
+    ruleId: body.ruleId ?? null,
+    remark: body.remark ?? null,
+    proofItems: body.proofItems,
+  })
 }

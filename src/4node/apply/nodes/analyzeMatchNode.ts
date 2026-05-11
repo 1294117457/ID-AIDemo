@@ -6,7 +6,7 @@ import { z } from 'zod'
 import type { ApplyState } from '../../../3state/index.js'
 import { createChatModel } from '../../../2model/model.js'
 import { ANALYZE_SYSTEM, analyzeUserPrompt } from '../../../1common/prompts.js'
-import { getScoreTemplatesMcp } from '../../../7controller/mcp/index.js'
+import { getScoreTemplatesTool } from '../../../7controller/mcp/index.js'
 
 const SuggestionSchema = z.object({
   suggestions: z.array(z.object({
@@ -21,24 +21,30 @@ const SuggestionSchema = z.object({
 
 export async function analyzeMatchNode(
   state: ApplyState,
-  config: { configurable: { userToken?: string } }
+  _config: { configurable: Record<string, unknown> }
 ): Promise<Partial<ApplyState>> {
   console.log('--apply:analyzeMatch')
 
-  const userToken = config?.configurable?.userToken ?? ''
-  const result = await getScoreTemplatesMcp(userToken)
+  // token 从 AsyncLocalStorage 自动取，无需参数层层透传
+  const result = await getScoreTemplatesTool()
 
-  if (!result.success || !result.data?.templates?.length) {
+  if (!result.success || !Array.isArray(result.data)) {
     console.warn('--apply:analyzeMatch: MCP 拉取失败:', result.error)
     return { checkResults: ['{"error":"无可用加分模板，请稍后重试"}'] }
   }
 
-  const templates = result.data.templates
+  // 兼容新旧两种返回格式
+  const templates = (result.data as any).templates ?? result.data
+  if (!templates?.length) {
+    console.warn('--apply:analyzeMatch: MCP 返回模板为空')
+    return { checkResults: ['{"error":"无可用加分模板，请稍后重试"}'] }
+  }
+
   console.log(`--apply:analyzeMatch: MCP 拉取到 ${templates.length} 个模板`)
 
-  const templatesForPrompt = templates.map(t => ({
+  const templatesForPrompt = templates.map((t: any) => ({
     id: t.id, templateName: t.templateName, templateType: t.templateType,
-    rules: t.rules.map(r => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
+    rules: t.rules.map((r: any) => ({ id: r.id, ruleName: r.ruleName, ruleScore: r.ruleScore }))
   }))
 
   const model = createChatModel(0.1).withStructuredOutput(SuggestionSchema)
