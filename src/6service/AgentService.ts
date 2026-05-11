@@ -10,6 +10,7 @@ import { appendMessage, getConversationBySession } from './ConversationService.j
 import { SKIP_NODES } from '../1common/constants.js'
 import { decodeFileName } from '../1common/utils/index.js'
 import { extractAuth } from './utils/auth.js'
+import type { AuthenticatedRequest } from '../7controller/middleware/auth.js'
 import type { AgentInput, AgentResult } from '../1common/types/shared.js'
 import type { Request } from 'express'
 import fs from 'fs'
@@ -248,8 +249,12 @@ export async function parseAgentParams(req: Request) {
   const body = req.body as any
   const userInput  = String(body.message ?? '').trim()
   const sessionId = body.sessionId ?? 'default'
-  const userId = (req.headers['x-user-id'] as string) || null
 
+  // 从 requireAuth 中间件注入的已验证 userId（密码学保证，不再信任 x-user-id 头）
+  const authReq = req as AuthenticatedRequest
+  const userId = authReq.userId != null ? String(authReq.userId) : null
+
+  // userToken 透传到后端 MCP 接口
   const authHeader = (req.headers['authorization'] as string) || ''
   const userToken = authHeader.startsWith('Bearer ')
     ? authHeader.slice(7)

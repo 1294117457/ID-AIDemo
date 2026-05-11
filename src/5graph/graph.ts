@@ -21,11 +21,12 @@ import {
 } from '../4node/apply/index.js'
 
 // ─────────────────────────────────────────────────────────────────
-// 懒加载编译（只在此文件被首次 import 时执行一次）
+// 懒加载编译（模块级缓存，只在首次调用时编译一次）
 // ─────────────────────────────────────────────────────────────────
 
+let _compiled: any = null
+
 export async function getCompiledGraph() {
-  let _compiled: any = null
   if (!_compiled) {
     // ── 咨询子图 ─────────────────────────────────────────
     const consultSubgraph = new StateGraph(ConsultStateAnnotation)

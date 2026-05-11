@@ -36,7 +36,12 @@ export async function initKnowledge(): Promise<void> {
   const files = fs.readdirSync(KNOWLEDGE_DIR)
     .filter(f => SUPPORTED_EXTS.has(path.extname(f).toLowerCase()) && !f.startsWith('~$'))
 
-  console.log(`[rag] 发现 ${files.length} 个文件，开始入库...`)
+  console.log(`[rag] 知识库加载：发现 ${files.length} 个待入库文件，${existingMeta.length} 个已入库，共 ${existingMeta.length} 个文件就绪`)
+
+  if (files.length === 0) {
+    console.log(`[rag] 初始化完毕，无需入库新文件`)
+    return
+  }
 
   let ok = 0
   for (const file of files) {
@@ -57,7 +62,14 @@ export async function initKnowledge(): Promise<void> {
   }
 
   const finalMeta = await listFileMeta()
-  console.log(`[rag] 初始化完毕，共入库 ${ok} 个文件，总 ${finalMeta.length} 个文件已就绪`)
+  if (finalMeta.length === 0) {
+    console.log(`[rag] 初始化完毕，知识库为空（无任何文件）`)
+    return
+  }
+  console.log(`[rag] 初始化完毕，共 ${finalMeta.length} 个文件已就绪：`)
+  for (const f of finalMeta) {
+    console.log(`       - ${f.sourceFile} (${f.chunkCount} 块 / ${f.textLength} 字)`)
+  }
 }
 
 // ── 检索 ─────────────────────────────────────────────────────────────────────
