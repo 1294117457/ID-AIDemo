@@ -1,24 +1,18 @@
-// ─── AsyncLocalStorage 上下文 — 等价于 Java ThreadLocal ─────────────────────
-// Node.js 16+ 原生支持，无需安装任何依赖
-// 用于在异步调用链中存储当前请求的用户数据（userId + JWT）
-// 整个调用链（Controller → AgentService → Node → mcpClient）都能访问
-
+/**
+ * AsyncLocalStorage上下文
+ * 获取UserId,Token,SessionId,TenantId
+ */
 import { AsyncLocalStorage } from 'async_hooks'
-
-// ── 上下文类型定义 ──────────────────────────────────────────────────────────
 
 export interface RequestContext {
   userId?: number
-  /** 前端用户 JWT（透传到后端 X-User-Token 请求头） */
   token?: string
   sessionId?: string
+  tenantId?: string
 }
-
-// ── 全局存储实例（进程级别单例）──────────────────────────────────────────────
 
 export const requestContext = new AsyncLocalStorage<RequestContext>()
 
-// ── 工具函数 ────────────────────────────────────────────────────────────────
 
 /**
  * 获取当前请求的用户 ID
@@ -41,4 +35,10 @@ export function getCurrentToken(): string | undefined {
  */
 export function getRequestContext(): RequestContext | undefined {
   return requestContext.getStore()
+}
+/**
+ * 获取当前请求的租户ID
+ */
+export function getCurrentTenantId(): string {
+  return requestContext.getStore()?.tenantId ?? 'default'
 }

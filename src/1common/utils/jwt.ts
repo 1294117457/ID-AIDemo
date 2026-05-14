@@ -15,6 +15,7 @@ export interface JWTPayload {
   sub: string        // username
   exp: number
   iat: number
+  tenantId:string
 }
 
 // ── JWT 验证异常 ──────────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ export function verifyJWT(token: string): JWTPayload {
       sub:       decoded['sub'] as string,
       exp:       decoded['exp'] as number,
       iat:       decoded['iat'] as number,
+      tenantId: (decoded['tenantId'] as string) || 'default',
     }
 
     if (!payload.tokenType || (payload.tokenType !== 'access' && payload.tokenType !== 'refresh')) {

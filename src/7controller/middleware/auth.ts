@@ -1,7 +1,8 @@
-// ─── Layer 7: 认证中间件 — JWT 验证 + AsyncLocalStorage 注入 ─────────────────
-// 所有需要登录才能访问的路由，都通过此中间件保护
-// 验证后存入 AsyncLocalStorage，后续整个异步调用链都能通过 getCurrentUserId() / getCurrentToken() 访问
-
+/**
+ * requireAuth: 强鉴权中间件，必须登录
+ * optionalAuth: 可选鉴权中间件，允许未登录
+ * jsonResponse: 统一响应格式
+ */
 import type { Request, Response, NextFunction } from 'express'
 import { verifyJWT, JWTError } from '../../1common/utils/jwt.js'
 import { requestContext } from '../mcp/requestContext.js'
@@ -9,28 +10,22 @@ import { requestContext } from '../mcp/requestContext.js'
 // ── 扩展 Request 类型（挂载已验证的用户信息）────────────────────────────────────
 
 export interface AuthenticatedRequest extends Request {
-  /** 验证后的用户 ID（number 类型，来自 JWT payload） */
   userId?: number
-  /** 验证后的用户名（来自 JWT sub） */
   username?: string
+  tenantId?: string
 }
 
-// ── 统一响应格式 ─────────────────────────────────────────────────────────────
-
+/**
+ * jsonResponse: 统一响应格式
+ */
 function jsonResponse(res: Response, status: number, code: number, msg: string, data: unknown = null) {
   res.status(status).json({ code, msg, data })
 }
 
-// ── 强鉴权中间件（必须登录）─────────────────────────────────────────────────
-
 /**
- * 验证 Authorization: Bearer <token>
- * - 无 token → 401 未登录
- * - token 无效/签名错误 → 401 Token 无效
- * - token 已过期 → 403 Token 已过期
- * - tokenType != access → 403 Token 类型错误
- * - 验证通过 → req.userId + req.username 挂载到请求对象
- *              同时存入 AsyncLocalStorage，后续异步链可取
+ * requireAuth: 强鉴权中间件，必须登录
+ * 根据token判断是否登录、过期
+ * 验证成功，挂载到请求对象，同时存入 AsyncLocalStorage，后续异步链可取
  */
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization']
@@ -66,6 +61,7 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
         userId:    payload.userId,
         token,
         sessionId: req.body?.sessionId,
+        tenantId:  payload.tenantId,
       },
       () => next()
     )
@@ -78,11 +74,9 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   }
 }
 
-// ── 可选鉴权（允许未登录，返回 null）────────────────────────────────────────
-
 /**
- * 提取 userId（允许未登录，失败返回 null）
- * 用于不强制登录但需要用户身份的场景
+ * optionalAuth: 可选鉴权中间件，允许未登录
+ * 失败返回null
  */
 export function optionalAuth(req: AuthenticatedRequest): number | null {
   const authHeader = req.headers['authorization']
@@ -95,6 +89,7 @@ export function optionalAuth(req: AuthenticatedRequest): number | null {
     const payload = verifyJWT(token)
     req.userId   = payload.userId
     req.username = payload.sub
+    req.tenantId=payload.tenantId
     return payload.userId
   } catch {
     return null
