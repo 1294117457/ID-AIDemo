@@ -9,8 +9,8 @@ import { searchKnowledge } from './rag.js'
 import { ANALYZE_SYSTEM, analyzeUserPrompt } from './prompts.js'
 import type { ApplyStateType } from '../3state/state.js'
 
-const JAVA_URL    = process.env.JAVA_BACKEND_URL    ?? 'http://localhost:8080'
-const SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY ?? 'id-ai-internal-secret-2024'
+const JAVA_URL    = process.env.JAVA_BACKEND_URL!
+const SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY!
 
 // ── fetchPolicyNode ───────────────────────────────────────────────────────────
 

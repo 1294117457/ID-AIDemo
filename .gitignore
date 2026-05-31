@@ -1,36 +1,43 @@
-# Dependencies
-# node_modules/
-
-# Environment
+# ─── 环境与凭证（最优先）──────────────────────────────────
 .env
 .env.local
 .env.*.local
+*.env
 
-# Build
-# dist/
+# ─── 依赖 ─────────────────────────────────────────────────
+node_modules/
+
+# ─── 构建产物 ──────────────────────────────────────────────
+dist/
+build/
 *.tsbuildinfo
 
-# IDE
-.vscode/
+# ─── 运行时数据（SQLite DB / Checkpoint / 上传文件）─────────
+data/
+*.db
+*.db-shm
+*.db-wal
+uploads/
+temp/
+tmp/
+*.tmp
+
+# ─── 知识库文件 ────────────────────────────────────────────
+docs/
+
+# ─── 日志 ─────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── IDE ──────────────────────────────────────────────────
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 *.code-workspace
 
-# Logs
-logs/
-*.log
-
-# Runtime
-uploads/
-data/*.db
-
-# OS
+# ─── 操作系统 ─────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-
-# Temp
-temp/
-tmp/
-*.tmp
