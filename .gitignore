@@ -22,10 +22,6 @@ dist/
 logs/
 *.log
 
-# Runtime
-uploads/
-data/*.db
-
 # OS
 .DS_Store
 Thumbs.db
@@ -34,3 +30,7 @@ Thumbs.db
 temp/
 tmp/
 *.tmp
+
+# rag data（统一在 src/rag/data/ 下）
+/src/rag/data/
+/src/rag/src/migrate.ts

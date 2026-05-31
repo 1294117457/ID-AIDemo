@@ -1,66 +1,76 @@
-// ─── Layer 5: Graph — 图编排 ───────────────────────────────────────────────────
+// ─── Layer 4: Graph — 图编排 ───────────────────────────────────────────────────
 // 组装所有节点为 LangGraph 图。每层只负责编排，不写业务逻辑。
 
 import { StateGraph, START, END } from '@langchain/langgraph'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
-import { MainState, ApplyState, ConsultState } from '../3state/state.js'
-import { CHECKPOINT_PATH } from '../1config/config.js'
+import { MainStateAnnotation, ApplyStateAnnotation, ConsultStateAnnotation } from '../3state/index.js'
+import { CHECKPOINT_PATH } from '../1common/config.js'
 
-import { classifyNode, askForMoreNode } from '../4node/classifyNodes.js'
-import { fetchPolicyNode, analyzeAndMatchNode, summarizeNode, confirmNode, submitNode, confirmRoute } from '../4node/applyNodes.js'
-import { retrieveNode, answerNode } from '../4node/consultNodes.js'
+// 主图节点
+import { classifyNode, askForMoreNode } from '../4node/classify/index.js'
+// consult 子图节点
+import { retrieveNode, answerNode } from '../4node/consult/index.js'
+// apply 子图节点
+import {
+  fetchPolicyNode,
+  analyzeMatchNode,
+  summarizeNode,
+  confirmRoute,
+  confirmNode,
+  submitNode,
+} from '../4node/apply/index.js'
 
-// ── 咨询子图 ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// 懒加载编译（模块级缓存，只在首次调用时编译一次）
+// ─────────────────────────────────────────────────────────────────
 
-const consultSubgraph = new StateGraph(ConsultState)
-  .addNode('retrieve', retrieveNode)
-  .addNode('answer',   answerNode)
-  .addEdge(START, 'retrieve')
-  .addEdge('retrieve', 'answer')
-  .addEdge('answer', END)
-  .compile()
-
-// ── 申请子图 ──────────────────────────────────────────────────────────────────
-
-const applySubgraph = new StateGraph(ApplyState)
-  .addNode('fetchPolicy',     fetchPolicyNode)
-  .addNode('analyzeAndMatch', analyzeAndMatchNode)
-  .addNode('summarize',       summarizeNode)
-  .addNode('confirm',         confirmNode)
-  .addNode('submit',          submitNode)
-  .addEdge(START, 'fetchPolicy')
-  .addEdge('fetchPolicy', 'analyzeAndMatch')
-  .addEdge('analyzeAndMatch', 'summarize')
-  .addConditionalEdges('summarize', confirmRoute, { confirm: 'confirm', end: END })
-  .addEdge('confirm', 'submit')
-  .addEdge('submit', END)
-  .compile()
-
-// ── 主图 ──────────────────────────────────────────────────────────────────────
-
-const mainGraph = new StateGraph(MainState)
-  .addNode('classify',     classifyNode)
-  .addNode('ask',          askForMoreNode)
-  .addNode('applyGraph',   applySubgraph)
-  .addNode('consultGraph', consultSubgraph)
-  .addEdge(START, 'classify')
-  .addConditionalEdges('classify', (s) => s.intent, {
-    insufficient: 'ask',
-    apply:        'applyGraph',
-    consult:      'consultGraph',
-  })
-  .addEdge('ask', 'classify')
-  .addEdge('applyGraph',   END)
-  .addEdge('consultGraph', END)
-
-// ── 编译（带缓存，避免重复编译） ──────────────────────────────────────────────
-
-let _compiled: Awaited<ReturnType<typeof mainGraph.compile>> | null = null
+let _compiled: any = null
 
 export async function getCompiledGraph() {
   if (!_compiled) {
+    // ── 咨询子图 ─────────────────────────────────────────
+    const consultSubgraph = new StateGraph(ConsultStateAnnotation)
+      .addNode('retrieve', retrieveNode)
+      .addNode('answer',   answerNode)
+      .addEdge(START, 'retrieve')
+      .addEdge('retrieve', 'answer')
+      .addEdge('answer', END)
+      .compile()
+
+    // ── 申请子图 ─────────────────────────────────────────
+    const applySubgraph = new StateGraph(ApplyStateAnnotation)
+      .addNode('fetchPolicy',     fetchPolicyNode)
+      .addNode('analyzeAndMatch', (state: any, config: any) => analyzeMatchNode(state, config))
+      .addNode('summarize',       summarizeNode)
+      .addNode('confirm',         confirmNode)
+      .addNode('submit',          (state: any, config: any) => submitNode(state, config))
+      .addEdge(START, 'fetchPolicy')
+      .addEdge('fetchPolicy', 'analyzeAndMatch')
+      .addEdge('analyzeAndMatch', 'summarize')
+      .addConditionalEdges('summarize', confirmRoute, { confirm: 'confirm', end: END })
+      .addEdge('confirm', 'submit')
+      .addEdge('submit', END)
+      .compile()
+
+    // ── 主图 ─────────────────────────────────────────────
     const checkpointer = SqliteSaver.fromConnString(CHECKPOINT_PATH)
-    _compiled = mainGraph.compile({ checkpointer })
+
+    const mainGraph = new StateGraph(MainStateAnnotation)
+      .addNode('classify',     classifyNode)
+      .addNode('ask',          askForMoreNode)
+      .addNode('applyGraph',   applySubgraph)
+      .addNode('consultGraph', consultSubgraph)
+      .addEdge(START, 'classify')
+      .addConditionalEdges('classify', (s: any) => s.intent, {
+        insufficient: 'ask',
+        apply:        'applyGraph',
+        consult:      'consultGraph',
+      })
+      .addEdge('ask', 'classify')
+      .addEdge('applyGraph',   END)
+      .addEdge('consultGraph', END)
+      .compile({ checkpointer })
+    _compiled = mainGraph
   }
   return _compiled
 }
