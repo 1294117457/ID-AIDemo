@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from config.settings import get_settings
-from config.database import init_db, init_config
 from router import (
     agent_router,
     conversation_router,
@@ -26,6 +25,7 @@ async def lifespan(app: FastAPI):
     # 启动时
     print("[agent] 启动中...")
     try:
+        from config.database import init_db, init_config
         init_db()
         init_config()
         print("[agent] 数据库初始化完成")

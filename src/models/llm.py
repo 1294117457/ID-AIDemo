@@ -28,7 +28,6 @@ def create_chat_model(temperature: float = 0.3) -> ChatOpenAI:
             base_url=base_url,
             model=model_name,
             temperature=temperature,
-            model_kwargs={"enable_thinking": False},
         )
     
     return _llm_cache[temperature]
