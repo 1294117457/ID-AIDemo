@@ -20,7 +20,7 @@ class BackendClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{cls.BASE_URL}/internal/tools/score-templates",
+                    f"{cls.BASE_URL}/internal/mcp/tools/get_score_templates",
                     headers={"X-User-Token": user_token} if user_token else {},
                 )
                 response.raise_for_status()
@@ -53,7 +53,7 @@ class BackendClient:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
-                    f"{cls.BASE_URL}/internal/tools/user-info",
+                    f"{cls.BASE_URL}/internal/mcp/tools/get_user_info",
                     headers={
                         "X-User-Token": user_token,
                         "X-User-Id": str(user_id)
@@ -91,7 +91,7 @@ class BackendClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{cls.BASE_URL}/internal/tools/applications",
+                    f"{cls.BASE_URL}/internal/mcp/tools/submit_application",
                     headers={"X-User-Token": user_token} if user_token else {},
                     json={
                         "sessionId": session_id,

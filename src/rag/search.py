@@ -82,16 +82,17 @@ async def add_knowledge(texts: List[str], metadatas: List[dict] | None = None) -
         embeddings_list = embeddings.embed_documents(texts)
         
         with engine.connect() as conn:
-            for i, (text, embedding) in enumerate(zip(texts, embeddings_list)):
+            for i, (text_item, embedding) in enumerate(zip(texts, embeddings_list)):
                 metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
+                import json
                 conn.execute(
                     text("""
                         INSERT INTO policy_vectors (content, metadata, embedding)
                         VALUES (:content, :metadata::jsonb, :embedding::vector)
                     """),
                     {
-                        "content": text,
-                        "metadata": str(metadata),
+                        "content": text_item,
+                        "metadata": json.dumps(metadata, ensure_ascii=False),
                         "embedding": str(embedding)
                     }
                 )
@@ -101,6 +102,64 @@ async def add_knowledge(texts: List[str], metadatas: List[dict] | None = None) -
     except Exception as e:
         print(f"[rag] add error: {e}")
         return False
+
+
+async def list_knowledge_files() -> list[dict]:
+    """
+    列出知识库中所有文件及其 chunk 数量
+    
+    Returns:
+        [{"sourceFile": "xxx.pdf", "chunkCount": 5}, ...]
+    """
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT metadata->>'source_file' AS source_file, COUNT(*) AS chunk_count
+                    FROM policy_vectors
+                    WHERE metadata->>'source_file' IS NOT NULL
+                    GROUP BY metadata->>'source_file'
+                    ORDER BY source_file
+                """)
+            ).fetchall()
+            return [{"sourceFile": row[0], "chunkCount": row[1]} for row in rows]
+    except Exception as e:
+        print(f"[rag] list_knowledge error: {e}")
+        return []
+
+
+async def delete_knowledge_by_source(source_file: str) -> bool:
+    """
+    删除指定源文件的所有知识块
+    
+    Args:
+        source_file: 文件名（对应 metadata.source_file）
+        
+    Returns:
+        是否成功
+    """
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(
+                text("DELETE FROM policy_vectors WHERE metadata->>'source_file' = :source_file"),
+                {"source_file": source_file}
+            )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[rag] delete_knowledge error: {e}")
+        return False
+
+
+async def add_knowledge_from_file(texts: list[str], source_file: str) -> bool:
+    """
+    从文件添加知识，自动附带 source_file 元数据
+    """
+    import json
+    metadatas = [{"source_file": source_file} for _ in texts]
+    return await add_knowledge(texts, metadatas)
 
 
 async def get_system_role() -> str:

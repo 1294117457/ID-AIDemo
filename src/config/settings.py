@@ -1,7 +1,11 @@
 """环境配置 - 对应 TS: config.ts"""
 import os
+from pathlib import Path
 from functools import lru_cache
 from pydantic_settings import BaseSettings
+
+# .env 文件位于项目根目录（src 的上一级）
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -35,7 +39,7 @@ class Settings(BaseSettings):
     CONTEXT_MAX_MESSAGES: int = 20
 
     class Config:
-        env_file = ".env"
+        env_file = str(_ENV_FILE)
         env_file_encoding = "utf-8"
 
 

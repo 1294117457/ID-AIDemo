@@ -8,7 +8,7 @@ from schemas.types import AgentInput, AgentResult
 from utils.constants import SKIP_NODES
 from .conversation_service import append_message, get_conversation_by_session
 from .memory import should_compress, compress_messages
-from rag.file_parser import parse_file_to_text, decode_filename
+from rag.file_parser import parse_file_to_text
 
 
 class AgentService:
