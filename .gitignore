@@ -1,36 +1,34 @@
-# Dependencies
-node_modules/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data
+data/
+*.db
+*.db-journal
 
 # Environment
 .env
 .env.local
-.env.*.local
-
-# Build
-dist/
-*.tsbuildinfo
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-*.code-workspace
 
 # Logs
-logs/
 *.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Temp
-temp/
-tmp/
-*.tmp
-
-# rag data（统一在 src/rag/data/ 下）
-/src/rag/data/
-/src/rag/src/migrate.ts
+logs/
